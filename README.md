@@ -1,7 +1,7 @@
 # heaplib
 A Heap Library for both Kernel and Userland Use
 
-# Method
+# Method (testing)
 #
  - initialize
 	- MUST occur before multiproc/scheduler is running
