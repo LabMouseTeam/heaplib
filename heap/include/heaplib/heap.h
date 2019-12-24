@@ -200,7 +200,9 @@ heaplib_region_safenext(
  * \author Don A. Bailey <donb@labmou.se>
  * \date December 23, 2019
  */
-#define heaplib_node_footer(x) (heaplib_footer_t * )(&(x)->payload[heaplib_node_size((x))];
+#define heaplib_node_footer(x) 						\
+	(heaplib_footer_t * )(&(x)->payload[				\
+		heaplib_node_size((x))]);
 
 /**
  * \brief Rewind through the previous heaplib list.
