@@ -1,5 +1,7 @@
 #include "heaplib/heap.h"
 
+/* XXX convert this to use ptr2node.c */
+
 static heaplib_lock_t alloc_lock;
 
 static heaplib_error_t __heaplib_coalesce(heaplib_region_t *, heaplib_flags_t, int * );
@@ -312,8 +314,6 @@ __heaplib_calloc_within_region(
 	heaplib_node_t * n;
 	heaplib_node_t * a;
 	heaplib_node_t * b;
-
-	/* XXX coalesce must be implemented here */
 
 	b = nil;
 	a = nil;
