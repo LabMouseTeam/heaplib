@@ -1,4 +1,4 @@
-#include "heaplib/heap.h"
+#include "heaplib/heaplib.h"
 
 /* XXX convert this to use ptr2node.c */
 

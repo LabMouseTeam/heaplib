@@ -1,4 +1,4 @@
-#include "heaplib/heap.h"
+#include "heaplib/heaplib.h"
 
 static heaplib_region_t regions[NREGIONS];
 

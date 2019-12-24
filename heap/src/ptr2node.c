@@ -1,4 +1,4 @@
-#include "heaplib/heap.h"
+#include "heaplib/heaplib.h"
 
 static boolean_t __heaplib_ptr2node_forward(heaplib_region_t *, vaddr_t, heaplib_node_t * );
 static boolean_t __heaplib_ptr2node_backward(heaplib_region_t *, vaddr_t, heaplib_node_t * );
