@@ -271,3 +271,6 @@ extern boolean_t __heaplib_ptr2node(
 			vaddr_t,
 			heaplib_node_t * );
 
+/* Debug */
+extern void heaplib_walk(void);
+

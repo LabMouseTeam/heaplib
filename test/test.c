@@ -22,7 +22,7 @@ main(int argc, char * argv[])
 	srandom(time(nil) ^ getpid());
 
 	printf("--- init %d ---\n", getpid());
-	mem_init(calloc(1, MEMSZ), MEMSZ);
+	heaplib_region_add(calloc(1, MEMSZ), MEMSZ, heaplib_flags_internal);
 	printf("\n");
 
 	memset(&x[0], 0, sizeof x);
@@ -35,7 +35,7 @@ main(int argc, char * argv[])
 			printf("--- alloc ---\n");
 			sz = random() % MEMSZ;
 			printf("requesting alloc sz=%d\n", sz);
-			if(!mem_calloc(&x[i], 1, sz, 0))
+			if(!heaplib_calloc(&x[i], 1, sz, 0))
 				break;
 			printf("allocated: p=%p size=%d\n", x[i], sz);
 			printf("\n");
@@ -56,11 +56,11 @@ main(int argc, char * argv[])
 					printf("freeing p=%p\n", x[r]);
 					f = x[r];
 					x[r] = nil;
-					mem_free(&f);
+					heaplib_free(&f, 0);
 				}
 			}
 
-			mem_walk();
+			heaplib_walk();
 			printf("\n");
 			i = 0;
 		}
@@ -69,6 +69,6 @@ main(int argc, char * argv[])
 	printf("\n--- END ---\n");
 	printf("got OOM?\n");
 
-	mem_walk();
+	heaplib_walk();
 }
 
