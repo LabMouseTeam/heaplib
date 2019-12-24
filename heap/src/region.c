@@ -4,59 +4,172 @@ static heaplib_region_t regions[NREGIONS];
 
 static heaplib_lock_t heaplib_region_lock;
 
-static boolean_t __heaplib_region_alloc(vaddr_t, size_t, heaplib_flags_t);
+static heaplib_error_t __region_test_and_lock(heaplib_region_t *, heaplib_flags_t);
 
 /**
- * \brief Acquire the pointer to our Regions.
+ * \brief Retrieve the first matching Region for the specified flags.
  *
- * \warning This function acquires the Region lock and does not release it.
- * Please use the release function to properly release the Region lock once
- * a specific region has (or all have) been used.
+ * Scan through the Region list searching for a Region with matching flags and
+ * return it locked.
  *
  * \author Don A. Bailey <donb@labmou.se>
- * \date December 20, 2019
+ * \date December 22, 2019
  */
 heaplib_error_t
-heaplib_region_acquire(heaplib_region_t ** rp, heaplib_flags_t f)
+heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 {
 	heaplib_error_t e;
 	boolean_t x;
+	int i;
 
-	do {
+	/* First thing we do is attempt to lock the Master. Yield to flags */
+	do
+	{
 		x = heaplib_trylock(&heaplib_region_lock) == 0;
-	} while(!x && (f & heaplib_flags_wait));
+	} 
+	while(!x && (f & heaplib_flags_wait));
 	if(!x)
 		return heaplib_error_again;
 
-	*rp = &regions[0];
+	e = heaplib_error_fatal;
+	/* Once locked, search for the next matching Region */
+	for(i = 0; i < nelem(regions); i++)
+	{
+		e = __region_test_and_lock(&regions[i], f);
+		if(e == heaplib_error_none)
+		{
+			*rp = &regions[i];
+			break;
+		}
+	}
 
-	/* We have to return with the first Region locked. Note that because
-	 * we always need *one* Region, and the first Region is *always* the
-	 * built-in SRAM region (or the closest thing to it), this Region
-	 * may *never* be deleted. That's why the first node is not a pointer.
-	 * Thus, we can always safely wait unless we've been directed not to.
-	 */
-
-	/* This returns Again if the lock is locked and we aren't waiting */
-	e = heaplib_region_trylock(&(*rp)->lock, (f & heaplib_flags_wait));
-
-	/* If we didn't acquire the Region's lock, unlock the master */
-	if(e != heaplib_error_none)
-		heaplib_unlock(&heaplib_region_lock);
-
+	heaplib_unlock(&heaplib_region_lock);
 	return e;
 }
 
 /**
- * \brief Release the region lock.
+ * \warning This must be called with the Master locked.
+ * \warning We only test to see if flags match, allowing the caller to safely
+ * 	    retrieve all Regions if they wish.
+ */
+static heaplib_error_t
+__region_test_and_lock(heaplib_region_t * rp, heaplib_flags_t f)
+{
+	boolean_t x;
+
+	do {
+		x = heaplib_trylock(&(rp)->lock) == 0;
+	}
+	while(!x && (f & heaplib_flags_wait));
+	if(!x)
+		return heaplib_error_again;
+
+	/* The Region must be active and must not be restricted */
+	if((rp->flags & heaplib_flags_active) != 0 && 
+	   (rp->flags & heaplib_flags_restrict) == 0 &&
+	   (rp->flags & heaplib_flags_busy) == 0)
+	{
+		/* Either no flags are set (get any) or the flags match exactly */
+		if((f & heaplib_flags_regionmask) == 0 ||
+	   	   ((f & heaplib_flags_regionmask) == 
+		    (rp->flags & heaplib_flags_regionmask)))
+		{
+			/* We've got a match, so hold the lock */
+			return heaplib_error_none;
+		}
+	}
+
+	/* No match. Unlock */
+	heaplib_unlock(&(rp)->lock);
+	return heaplib_error_fatal;
+}
+
+/**
+ * \brief Retrieve the next matching Region for the specified flags.
+ *
+ * Scan through the Region list searching for a Region with matching flags and
+ * return it locked. Presume the provided Region is locked and was previously
+ * returned by this function or by _find_first. Use the base address to scan
+ * upward in memory for subsequent regions.
+ *
+ * \warning This function expects a valid and *locked* Region in rp
  *
  * \author Don A. Bailey <donb@labmou.se>
- * \date December 20, 2019
+ * \date December 22, 2019
  */
-void
-heaplib_region_release(void)
+heaplib_error_t
+heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 {
+	heaplib_error_t e;
+	boolean_t x;
+	vbaddr_t b;
+	int i;
+	int j;
+	int k;
+
+	/* First thing we do is release the current lock. */
+	b = (*rp)->addr;
+	heaplib_unlock(&(*rp)->lock);
+
+	/* Second thing we do is attempt to lock the Master. Yield to flags */
+	do {
+		x = heaplib_trylock(&heaplib_region_lock) == 0;
+	}
+	while(!x && (f & heaplib_flags_wait));
+	if(!x)
+		return heaplib_error_again;
+
+	/* With the Master lock held, we can read the entire table without
+	 * holding a lock, because the Regions themselves cannot be altered.
+	 * So find the next viable candidate.
+	 */
+	k = -1;
+	for(i = 0; i < nelem(regions); i++)
+	{
+		if(b >= regions[i].addr)
+		{
+			continue;
+		}
+
+		k = i;
+		/* Now test for the closest match */
+		for(j = i + 1; j < nelem(regions); j++)
+		{
+			if(regions[i].addr >= regions[j].addr)
+			{
+				continue;
+			}
+
+			k = j;
+			break;
+		}
+	}
+
+	/* No other region found */
+	if(k == -1)
+	{
+		heaplib_unlock(&heaplib_region_lock);
+		return heaplib_error_fatal;
+	}
+
+	/* Found! Now, attempt to hold the Region's lock */
+	*rp = &regions[k];
+
+	do {
+		x = heaplib_trylock(&region[k].lock) == 0;
+	}
+	while(!x && (f & heaplib_flags_wait));
+
+	/* We're OK to unlock the master regardless of if we succeeded. */
 	heaplib_unlock(&heaplib_region_lock);
+
+	if(!x)
+	{
+		*rp = nil;
+		return heaplib_error_again;
+	}
+
+	return heaplib_error_none;
 }
 
 /**
@@ -65,7 +178,7 @@ heaplib_region_release(void)
  * \author Don A. Bailey <donb@labmou.se>
  * \date December 19, 2019
  */
-boolean_t
+heaplib_error_t
 heaplib_region_delete(heaplib_region_t r)
 {
 	/* XXX what the heck is the best way to do this to force migration or
@@ -96,6 +209,7 @@ heaplib_region_delete(heaplib_region_t r)
 			- so the person with the calloc Lock on the adjacent Region
 			  can still use our next pointer to skip past a Restrict Region
 	 */
+	return heaplib_error_fatal; // XXX not implemented yet
 }
 
 /**
@@ -104,82 +218,46 @@ heaplib_region_delete(heaplib_region_t r)
  * \author Don A. Bailey <donb@labmou.se>
  * \date December 19, 2019
  */
-boolean_t
+heaplib_error_t
 heaplib_region_add(vaddr_t a, size_t sz, heaplib_flags_t f)
 {
-	heaplib_region_t * v;
-	heaplib_region_t * n;
-	boolean_t r;
+	heaplib_region_t * h;
+	heaplib_node_t * n;
 
+	/* This process always waits */
 	heaplib_lock(&heaplib_region_lock);
 
-	r = True;
-	if(regions.flags & heaplib_flags_active)
+	h = nil;
+	for(i = 0; i < nelem(regions); i++)
 	{
-		r = __heaplib_region_alloc(&v);
-	}
-	else
-	{
-		v = &regions;
-	}
-
-	if(r)
-	{
-		heaplib_lock_init(&v->lock);
-
-		v->flags = f | heaplib_flags_active;
-		v->next = nil;
-		v->size = sz;
-		v->addr = a;
-
-		if(v != &regions)
+		if(!(regions[i].flags & active))
 		{
-			n = &regions;
-			while(n->next)
-				n = n->next;
-			n->next = v;
-			v->prev = n;
+			h = &regions[i];
+			break;
 		}
 	}
 
-	heaplib_unlock(&heaplib_region_lock);
-	return r;
-}
-
-/**
- * \brief Allocate a new Region.
- *
- * \author Don A. Bailey <donb@labmou.se>
- * \date December 20, 2019
- */
-static boolean_t
-__heaplib_region_alloc(heaplib_region_t ** vp)
-{
-	heaplib_region_t * v;
-	heaplib_region_t * x;
-	boolean_t r;
-
-	/* Require the node to be Internal */
-	r = heaplib_calloc(
-		&v,
-		1,
-		sizeof *v,
-		(heaplib_flags_internal | heaplib_flags_wait));
-	if(!r)
-		return False;
-
-	*vp = v;
-
-	x = &regions;
-	do
+	if(!h)
 	{
-		if(!x->next)
-			x->next = v;
-
-		x = x->next;
+		/* XXX warning here that no region is free */
 	}
-	while(x);
+	else
+	{
+		heaplib_lock_init(&h->lock);
+		h->flags = f | heaplib_flags_active;
+		h->free = sz;
+		h->size = sz;
+		h->addr = a;
+		h->id = i;
 
-	return r;
+		/* Initialize the Region */
+		n = (heaplib_node_t * )h->addr;
+		h->free_list = n;
+		/* XXX generate new Node */
+	}
+
+	heaplib_unlock(&heaplib_region_lock);
+
+	return heaplib_error_none;
 }
 

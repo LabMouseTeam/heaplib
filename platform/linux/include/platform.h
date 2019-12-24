@@ -25,6 +25,7 @@ typedef pthread_t task_t;
 /* Scheduling */
 #define SCHEDULE_TASK(x) /* Nothing to do on Linux */
 #define YIELD() platform_yield();
+#define GET_PLATFORM_TASKID() nil
 
 /* How many regions do we support? In the future, this will be dynamic */
 #define NREGIONS 4

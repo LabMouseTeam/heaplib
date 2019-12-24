@@ -1,6 +1,8 @@
 #include "platform/platform.h"
 
-/* One chunk is always 32 bytes in size */
+#define HEAPLIB_MAGIC 0xDEADF417ULL
+
+/* Minimum conceptual object for alignment */
 #define HEAPLIB_CHUNKSZ (sizeof(size_t))
 /* Convert chunks to bytes */
 #define HEAPLIB_C2B(x) ((x) * HEAPLIB_CHUNKSZ)
@@ -8,8 +10,12 @@
 #define HEAPLIB_B2C(x) ((x)/HEAPLIB_CHUNKSZ)+((((x)%HEAPLIB_CHUNKSZ)>0)?1:0)
 
 /* We require a minimum of 4 chunks per node */
-#define HEAPLIB_MIN_CHUNKS ((4 * HEAPLIB_CHUNKSZ) +		\
-				sizeof(heaplib_node_t) +	\
+#define HEAPLIB_MIN_CHUNKS 	4
+/* The minimum node size includes the minimum chunks required and the metadata
+ * required to drive the free space.
+ */
+#define HEAPLIB_MIN_NODE ((HEAPLIB_MIN_CHUNKS * HEAPLIB_CHUNKSZ) +	\
+				sizeof(heaplib_node_t) +		\
 				sizeof(heaplib_footer_t))
 
 typedef size_t heaplib_magic_t;
@@ -23,11 +29,13 @@ typedef struct heaplib_subregion_t heaplib_subregion_t;
 struct
 heaplib_region_t
 {
+	size_t id;
 	size_t free;
 	size_t size;
 	vbaddr_t addr;
 	heaplib_lock_t lock;
 	heaplib_flags_t flags;
+	heaplib_node_t * free_list;
 
 } __attribute__((packed));
 
@@ -44,6 +52,7 @@ heaplib_node_t
 			task_t task;
 			union {
 				size_t refs:8;
+				size_t region:8;
 				size_t flags;
 			};
 		} pc_t;
@@ -98,7 +107,8 @@ heaplib_flags_t
 	heaplib_flags_subregions =	(1 << 9), /**< Contains subregions */
 
 	/* Flags for defining a Region */
-	heaplib_flags_regionmask =	(heaplib_flags_internal |
+	heaplib_flags_regionmask =	(heaplib_flags_wiped |
+						heaplib_flags_internal |
 						heaplib_flags_encrypted),
 
 	/* Flags specific to a Node */
@@ -111,6 +121,10 @@ heaplib_flags_t
 	heaplib_flags_securitymask =	(heaplib_flags_wiped |
 						heaplib_flags_internal |
 						heaplib_flags_encrypted),
+
+	/* "Don't use" flags */
+	heaplib_flag_dontuse =		(heaplib_flags_restrict |
+						heaplib_flags_busy),
 };
 
 #define heaplib_region_next(x) ((x)->next)
@@ -179,6 +193,16 @@ heaplib_region_safenext(
 #define heaplib_free_prev(x) ((x)->free_t.prev)
 
 /**
+ * \brief Return the footer of a node.
+ *
+ * \param x A heaplib node or the end of the heaplib region.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 23, 2019
+ */
+#define heaplib_node_footer(x) (heaplib_footer_t * )(&(x)->payload[heaplib_node_size((x))];
+
+/**
  * \brief Rewind through the previous heaplib list.
  *
  * \param x A heaplib node or the end of the heaplib region.
@@ -229,10 +253,11 @@ heaplib_region_trylock(heaplib_region_t * h, boolean_t w)
 	return heaplib_error_again;
 } __attribute__((always_inline));
 
-extern void heaplib_region_release(void);
-extern heaplib_error_t heaplib_region_acquire(heaplib_region_t **, heaplib_flags_t);
-extern boolean_t heaplib_region_delete(heaplib_region_t);
-extern boolean_t heaplib_region_add(vaddr_t, size_t, heaplib_flags_t);
+/* Region handling */
+extern heaplib_error_t heaplib_region_delete(heaplib_region_t);
+extern heaplib_error_t heaplib_region_add(vaddr_t, size_t, heaplib_flags_t);
+extern heaplib_error_t heaplib_region_find_next(heaplib_region_t **, heaplib_flags_t);
+extern heaplib_error_t heaplib_region_find_first(heaplib_region_t **, heaplib_flags_t);
 
 /* Allocation */
 extern heaplib_error_t heaplib_free(vaddr_t * );
