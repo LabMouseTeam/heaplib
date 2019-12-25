@@ -38,13 +38,15 @@ __region_walk(heaplib_region_t * h)
 {
 	heaplib_node_t * n;
 
-	fprintf(stdout, "walk region: %p free=%ld size=%ld addr=%p flags=%x free_list=%p\n",
+	fprintf(stdout, "walk region: %p free=%ld size=%ld addr=%p flags=%x free_list=%p nodes_free=%ld nodes_active=%ld\n",
 		h,
 		h->free,
 		h->size,
 		h->addr,
 		h->flags,
-		h->free_list);
+		h->free_list,
+		h->nodes_free,
+		h->nodes_active);
 
 	n = (heaplib_node_t * )h->addr;
 	while(heaplib_region_within(n, h))
@@ -362,6 +364,8 @@ heaplib_region_add(vaddr_t a, size_t sz, heaplib_flags_t f)
 		h->free = sz - (sizeof(*n) + sizeof(*nf));
 		h->size = sz - (sizeof(*n) + sizeof(*nf));
 		h->addr = (vbaddr_t)a;
+		h->nodes_active = 0;
+		h->nodes_free = 1;
 
 		/* Initialize the Region */
 		n = (heaplib_node_t * )h->addr;

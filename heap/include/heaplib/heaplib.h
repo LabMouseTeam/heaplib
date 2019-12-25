@@ -68,6 +68,8 @@ heaplib_region_t
 	size_t free;
 	size_t size;
 	vbaddr_t addr;
+	size_t nodes_free;
+	size_t nodes_active;
 	heaplib_lock_t lock;
 	heaplib_flags_t flags;
 	heaplib_node_t * free_list;

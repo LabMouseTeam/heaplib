@@ -87,6 +87,8 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			}
 
 			h->free += heaplib_node_size(a);
+			h->nodes_active -= 1;
+			h->nodes_free += 1;
 
 			heaplib_lock_unlock(&h->lock);
 			return heaplib_error_none;
@@ -221,15 +223,25 @@ __heaplib_calloc_with_coalesce(
 	{
 		/* Always just attempt to alloc, first */
 		e = __heaplib_calloc_within_region(h, vp, z, f);
+		if(e != heaplib_error_none ||
+		   h->nodes_free > h->nodes_active && ((h->free * 100) / h->size >= 50))
+		{
+			/* If we couldn't alloc, attempt to coalesce since we know
+		 	 * there are ample bytes, they just may not be adjacent.
+			 * If the balance of the heap is tilted, attempt to adjust.
+		 	 */
+			if(e == heaplib_error_none)
+				fprintf(stdout, "FORCED COALESCE!\n");
+
+			e = __heaplib_coalesce(h, f, &j);
+		}
+
 		if(e == heaplib_error_none)
 		{
 			fprintf(stdout, "__heaplib_calloc_with_coalesce: yay!\n");
 			return e;
 		}
 
-		/* If we couldn't alloc, attempt to coalesce since we know
-		 * there are ample bytes, they just may not be adjacent.
-		 */
 		e = __heaplib_coalesce(h, f, &j);
 	}
 
@@ -292,6 +304,8 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 				bf->size = heaplib_node_size(b);
 
 				a = heaplib_node_next(b);
+
+				h->nodes_free -= 1;
 
 				j++;
 			}
@@ -370,6 +384,7 @@ __heaplib_calloc_within_region(
 				bf->magic = HEAPLIB_MAGIC;
 
 				h->free -= (sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
+				h->nodes_free += 1;
 
 				a = n;
 			}
@@ -407,6 +422,8 @@ __heaplib_calloc_within_region(
 		a->active = True;
 
 		h->free -= heaplib_node_size(a);
+		h->nodes_active += 1;
+		h->nodes_free -= 1;
 	}
 
 	return (a == nil) ? heaplib_error_fatal : heaplib_error_none ;
