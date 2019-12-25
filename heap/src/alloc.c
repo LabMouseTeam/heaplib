@@ -1,4 +1,6 @@
 #include "heaplib/heaplib.h"
+#include <string.h>
+#include <stdio.h>
 
 /* XXX convert this to use ptr2node.c */
 
@@ -15,7 +17,7 @@ static heaplib_error_t __heaplib_calloc_with_coalesce(
 				heaplib_region_t * h,
 				vaddr_t * vp,
 				size_t z,
-				heaplib_flags_t f)
+				heaplib_flags_t f);
 
 heaplib_error_t
 heaplib_free(vaddr_t * vp, heaplib_flags_t f)
@@ -34,16 +36,19 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 	// change this to go backward if we are beyond the midpoint
 
 	/* Make sure the pointer is valid */
-	e = heaplib_region_by_ptr(v, &h, f);
+	fprintf(stdout, "free: find region\n");
+	e = heaplib_ptr2region(v, &h, f);
 	if(e != heaplib_error_none)
 	{
+		fprintf(stdout, "free: cant find region: %d\n", e);
 		return e;
 	}
 
+	fprintf(stdout, "free: spinning\n");
 	/* The Region is returned locked */
 	L = nil;
 	a = (heaplib_node_t * )h->addr;
-	while((caddr_t)a < (caddr_t)((caddr_t)a + h->size))
+	while(heaplib_region_within(a, h))
 	{
 		/* Save the Last (most recently observed) Free node */
 		if(!a->active)
@@ -54,7 +59,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			if(!a->active)
 			{
 				// XXX warning! should be active!
-				heaplib_unlock(&h->lock);
+				heaplib_lock_unlock(&h->lock);
 				return heaplib_error_fatal;
 			}
 
@@ -83,8 +88,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 
 			h->free += heaplib_node_size(a);
 
-			heaplib_unlock(&h->lock);
-
+			heaplib_lock_unlock(&h->lock);
 			return heaplib_error_none;
 		}
 
@@ -92,7 +96,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 	}
 
 	/* Not found */
-	heaplib_unlock(&h->lock);
+	heaplib_lock_unlock(&h->lock);
 	return heaplib_error_fatal;
 }
 
@@ -140,14 +144,15 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 	heaplib_region_t * h;
 	heaplib_region_t * n;
 	heaplib_error_t e;
-	heaplib_flags_t m;
-	heaplib_error_t e;
 
 	*vp = nil;
+
+	fprintf(stdout, "__heaplib_calloc: z=%ld\n", z);
 
 	e = heaplib_region_find_first(&h, f);
 	if(e != heaplib_error_none)
 	{
+		fprintf(stdout, "__heaplib_calloc: region_find_first %d\n", e);
 		return e;
 	}
 
@@ -161,10 +166,13 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 		 */
 		if(h->free >= z)
 		{
+			fprintf(stdout, "__heaplib_calloc: free!\n");
 			/* We have enough RAM and the flags are correct. */
 			e = __heaplib_calloc_with_coalesce(h, vp, z, f);
 			if(e == heaplib_error_none)
 			{
+				fprintf(stdout, "__heaplib_calloc: calloc_w_coal\n");
+				heaplib_lock_unlock(&h->lock);
 				return e;
 			}
 		}
@@ -173,6 +181,7 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 	}
 	while(h && e == heaplib_error_none);
 
+	fprintf(stdout, "__heaplib_calloc: generic? %d\n", e);
 	return e == heaplib_error_again ? 
 		heaplib_error_again :
 		heaplib_error_fatal;
@@ -214,6 +223,7 @@ __heaplib_calloc_with_coalesce(
 		e = __heaplib_calloc_within_region(h, vp, z, f);
 		if(e == heaplib_error_none)
 		{
+			fprintf(stdout, "__heaplib_calloc_with_coalesce: yay!\n");
 			return e;
 		}
 
@@ -223,6 +233,7 @@ __heaplib_calloc_with_coalesce(
 		e = __heaplib_coalesce(h, f, &j);
 	}
 
+	fprintf(stdout, "__heaplib_calloc_with_coalesce: hmm!\n");
 	return heaplib_error_fatal;
 }
 
@@ -245,21 +256,23 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 	if(jp)
 		*jp = 0;
 
+	fprintf(stdout, "__heaplib_coalesce: try\n");
+
 	b = nil;
 	a = h->free_list;
-	while(a != nil && ((caddr_t)a < (caddr_t)((caddr_t)a + h->size)))
+	while(a != nil && heaplib_region_within(a, h))
 	{
 		if(!b)
 		{
 			b = a;
-			a = a->next;
+			a = a->free_t.next;
 		}
 		else
 		{
 			if(heaplib_node_next(b) != a)
 			{
 				b = a;
-				a = a->next;
+				a = a->free_t.next;
 			}
 			else
 			{
@@ -314,24 +327,29 @@ __heaplib_calloc_within_region(
 	heaplib_node_t * n;
 	heaplib_node_t * a;
 	heaplib_node_t * b;
+	size_t o;
 
 	b = nil;
 	a = nil;
 	n = h->free_list;
 	while(n && n->active == False)
 	{
-		if(heaplib_node_size(n) >= z && 
-		   ((n->pc_t.flags & heaplib_flags_dontuse) == 0))
+		if(heaplib_node_size(n) >= z)
 		{
 			if(heaplib_node_size(n) == z || 
 			   (heaplib_node_size(n) - z) < HEAPLIB_MIN_NODE)
 			{
+				fprintf(stdout, "node expand!\n");
 				a = n;
 			}
 			else
 			{
+				fprintf(stdout, "node: split!\n");
+
 				/* There's ample room to perform node split */
-				b = (heaplib_node_t * )&n->payload[z + sizeof(heaplib_footer_t)];
+				o = heaplib_node_size(n);
+				n->size = z;
+				b = heaplib_node_next(n);
 
 				/* Temporarily add 'b' to the free list so it
 				 * can get adjusted properly later
@@ -340,17 +358,14 @@ __heaplib_calloc_within_region(
 				n->free_t.next = b;
 				b->free_t.prev = n;
 				if(b->free_t.next)
-					b->free_t.next->prev = b;
+					b->free_t.next->free_t.prev = b;
 
-				b->size = heaplib_node_size(n) - z - (sizeof(heaplib_node_t) +
-									sizeof(heaplib_footer_t));
-				bf = (heaplib_footer_t * )&b->payload[heaplib_node_size(b)];
+				b->size = o - z - (sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
+				bf = heaplib_node_footer(b);
 				bf->size = heaplib_node_size(b);
 				bf->magic = HEAPLIB_MAGIC;
 
-				n->size = z;
-
-				bf = (heaplib_footer_t * )&n->payload[heaplib_node_size(n)];
+				bf = heaplib_node_footer(n);
 				bf->size = heaplib_node_size(n);
 				bf->magic = HEAPLIB_MAGIC;
 
@@ -371,6 +386,8 @@ __heaplib_calloc_within_region(
 	}
 	else
 	{
+		fprintf(stdout, "found!\n");
+
 		*vp = (vaddr_t)&a->payload[0];
 
 		/* Now we can safely alter the free list */
@@ -384,7 +401,6 @@ __heaplib_calloc_within_region(
 		memset(&a->payload[0], 0, a->size);
 
 		a->pc_t.task = GET_PLATFORM_TASKID();
-		a->pc_t.region = h->id;
 		a->pc_t.flags = f;
 		a->pc_t.refs = 1;
 

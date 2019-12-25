@@ -7,13 +7,14 @@
 
 #include "heaplib/heaplib.h"
 
-#define MEMSZ (32 * 1024)
+#define MEMSZ (32 * 1024 )
+#define ALLOCSZ (1 * 1024)
 
 int
 main(int argc, char * argv[])
 {
-	caddr_t x[4];
-	caddr_t f;
+	vaddr_t x[32];
+	vaddr_t f;
 	int i;
 	int r;
 	int t;
@@ -33,16 +34,19 @@ main(int argc, char * argv[])
 		if(!x[i])
 		{
 			printf("--- alloc ---\n");
-			sz = random() % MEMSZ;
+			sz = random() % ALLOCSZ;
+			if(sz == 0)
+				sz = 1;
 			printf("requesting alloc sz=%d\n", sz);
-			if(!heaplib_calloc(&x[i], 1, sz, 0))
+			if(heaplib_calloc(&x[i], 1, sz, 0) != heaplib_error_none)
 				break;
 			printf("allocated: p=%p size=%d\n", x[i], sz);
 			printf("\n");
+			heaplib_walk();
 		}
 
 		i++;
-		if(i == 4)
+		if(i == nelem(x))
 		{
 			printf("--- free ---\n");
 			printf("wiping %d allocs\n", t);

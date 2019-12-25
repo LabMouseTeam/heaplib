@@ -1,7 +1,7 @@
 #include "heaplib/heaplib.h"
 
-static boolean_t __heaplib_ptr2node_forward(heaplib_region_t *, vaddr_t, heaplib_node_t * );
-static boolean_t __heaplib_ptr2node_backward(heaplib_region_t *, vaddr_t, heaplib_node_t * );
+static boolean_t __heaplib_ptr2node_forward(heaplib_region_t *, vaddr_t, heaplib_node_t ** );
+static boolean_t __heaplib_ptr2node_backward(heaplib_region_t *, vaddr_t, heaplib_node_t ** );
 
 /**
  * \brief Convert a heap pointer into a Node.
@@ -12,7 +12,7 @@ static boolean_t __heaplib_ptr2node_backward(heaplib_region_t *, vaddr_t, heapli
  * \date December 19, 2019
  */
 boolean_t
-__heaplib_ptr2node(heaplib_region_t * r, vaddr_t p, heaplib_node_t * np)
+heaplib_ptr2node(heaplib_region_t * r, vaddr_t p, heaplib_node_t ** np)
 {
 	heaplib_node_t * h;
 	vbaddr_t s;
@@ -28,7 +28,7 @@ __heaplib_ptr2node(heaplib_region_t * r, vaddr_t p, heaplib_node_t * np)
 		return False;
 	}
 
-	s = (vbaddr_t * )r->addr;
+	s = (vbaddr_t)r->addr;
 	s += r->size / 2;
 	if(p < (vaddr_t)s)
 		return __heaplib_ptr2node_forward(r, p, np);
@@ -40,7 +40,7 @@ static boolean_t
 __heaplib_ptr2node_forward(
 	heaplib_region_t * r,
 	vaddr_t p,
-	heaplib_node_t * np)
+	heaplib_node_t ** np)
 {
 	heaplib_node_t * h;
 	heaplib_node_t * e;
@@ -66,7 +66,7 @@ static boolean_t
 __heaplib_ptr2node_backward(
 	heaplib_region_t * r,
 	vaddr_t p,
-	heaplib_node_t * np)
+	heaplib_node_t ** np)
 {
 	heaplib_footer_t * f;
 	heaplib_node_t * h;
