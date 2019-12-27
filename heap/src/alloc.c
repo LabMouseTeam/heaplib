@@ -59,6 +59,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			if(!a->active)
 			{
 				// XXX warning! should be active!
+				fprintf(stdout, "ERROR: free on a active node? %p\n", v);
 				heaplib_lock_unlock(&h->lock);
 				return heaplib_error_fatal;
 			}
@@ -242,7 +243,7 @@ __heaplib_calloc_with_coalesce(
 			return e;
 		}
 
-		e = __heaplib_coalesce(h, f, &j);
+		// e = __heaplib_coalesce(h, f, &j);
 	}
 
 	fprintf(stdout, "__heaplib_calloc_with_coalesce: hmm!\n");
@@ -270,45 +271,41 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 
 	fprintf(stdout, "__heaplib_coalesce: try\n");
 
-	b = nil;
-	a = h->free_list;
-	while(a != nil && heaplib_region_within(a, h))
+	a = nil;
+	b = h->free_list;
+	if(b)
+		a = heaplib_free_next(b);
+	while(a && heaplib_region_within(a, h))
 	{
-		if(!b)
+		if(heaplib_node_next(b) != a)
 		{
 			b = a;
-			a = a->free_t.next;
+			a = heaplib_free_next(a);
 		}
 		else
 		{
-			if(heaplib_node_next(b) != a)
-			{
-				b = a;
-				a = a->free_t.next;
-			}
-			else
-			{
-				/* The nodes are adjacent so merge them */
-				h->free += sizeof(*a) + sizeof(*bf);
+			/* The nodes are adjacent so merge them */
+			h->free += sizeof(*a) + sizeof(*bf);
 
-				/* Consume the higher node */
-				b->free_t.next = a->free_t.next;
-				if(b->free_t.next)
-					b->free_t.next->free_t.prev = b;
+			/* Consume the higher node */
+			heaplib_free_next(b) = heaplib_free_next(a);
+			if(heaplib_free_next(b))
+				heaplib_free_prev(heaplib_free_next(b)) = b;
 
-				b->size += heaplib_node_size(a) +
-						sizeof(*a) +
-						sizeof(*bf);
+			fprintf(stdout, "coal: CONSUME size=%lu\n", b->size);
+			b->size += heaplib_node_size(a) +
+					sizeof(*a) +
+					sizeof(*bf);
+			fprintf(stdout, "coal: CONSUME NOW size=%lu\n", b->size);
 
-				bf = heaplib_node_footer(b);
-				bf->size = heaplib_node_size(b);
+			bf = heaplib_node_footer(b);
+			bf->size = heaplib_node_size(b);
 
-				a = heaplib_node_next(b);
+			a = heaplib_free_next(b);
 
-				h->nodes_free -= 1;
+			h->nodes_free -= 1;
 
-				j++;
-			}
+			j++;
 		}
 	}
 
