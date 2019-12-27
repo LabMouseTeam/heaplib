@@ -27,6 +27,7 @@ heaplib_walk(void)
 	for(i = 0; i < nelem(regions); i++)
 	{
 		fprintf(stdout, "walk: region=%d\n", i);
+		fflush(stdout);
 		__region_walk(&regions[i]);
 	}
 
@@ -47,6 +48,7 @@ __region_walk(heaplib_region_t * h)
 		h->free_list,
 		h->nodes_free,
 		h->nodes_active);
+	fflush(stdout);
 
 	n = (heaplib_node_t * )h->addr;
 	while(heaplib_region_within(n, h))
@@ -66,6 +68,7 @@ __region_walk(heaplib_region_t * h)
 				n->pc_t.task,
 				n->pc_t.refs,
 				n->pc_t.flags);
+			fflush(stdout);
 		}
 		else
 		{
@@ -76,6 +79,7 @@ __region_walk(heaplib_region_t * h)
 				heaplib_node_size(n),
 				n->free_t.next,
 				n->free_t.prev);
+			fflush(stdout);
 		}
 
 		n = heaplib_node_next(n);
@@ -167,6 +171,7 @@ __region_test_and_lock(heaplib_region_t * rp, heaplib_flags_t f)
 	boolean_t x;
 
 	fprintf(stdout, "region\n");
+	fflush(stdout);
 
 	do {
 		x = heaplib_lock_trylock(&(rp)->lock) == 0;
@@ -175,6 +180,7 @@ __region_test_and_lock(heaplib_region_t * rp, heaplib_flags_t f)
 	if(!x)
 	{
 		fprintf(stdout, "region cantlock\n");
+		fflush(stdout);
 		return heaplib_error_again;
 	}
 

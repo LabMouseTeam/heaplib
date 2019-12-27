@@ -37,14 +37,17 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 
 	/* Make sure the pointer is valid */
 	fprintf(stdout, "free: find region\n");
+	fflush(stdout);
 	e = heaplib_ptr2region(v, &h, f);
 	if(e != heaplib_error_none)
 	{
 		fprintf(stdout, "free: cant find region: %d\n", e);
+		fflush(stdout);
 		return e;
 	}
 
 	fprintf(stdout, "free: spinning\n");
+	fflush(stdout);
 	/* The Region is returned locked */
 	L = nil;
 	a = (heaplib_node_t * )h->addr;
@@ -60,6 +63,8 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			{
 				// XXX warning! should be active!
 				fprintf(stdout, "ERROR: free on a active node? %p\n", v);
+				fflush(stdout);
+
 				heaplib_lock_unlock(&h->lock);
 				return heaplib_error_fatal;
 			}
@@ -151,11 +156,13 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 	*vp = nil;
 
 	fprintf(stdout, "__heaplib_calloc: z=%ld\n", z);
+	fflush(stdout);
 
 	e = heaplib_region_find_first(&h, f);
 	if(e != heaplib_error_none)
 	{
 		fprintf(stdout, "__heaplib_calloc: region_find_first %d\n", e);
+		fflush(stdout);
 		return e;
 	}
 
@@ -170,11 +177,15 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 		if(h->free >= z)
 		{
 			fprintf(stdout, "__heaplib_calloc: free!\n");
+			fflush(stdout);
+
 			/* We have enough RAM and the flags are correct. */
 			e = __heaplib_calloc_with_coalesce(h, vp, z, f);
 			if(e == heaplib_error_none)
 			{
 				fprintf(stdout, "__heaplib_calloc: calloc_w_coal\n");
+				fflush(stdout);
+
 				heaplib_lock_unlock(&h->lock);
 				return e;
 			}
@@ -185,6 +196,7 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 	while(h && e == heaplib_error_none);
 
 	fprintf(stdout, "__heaplib_calloc: generic? %d\n", e);
+	fflush(stdout);
 	return e == heaplib_error_again ? 
 		heaplib_error_again :
 		heaplib_error_fatal;
@@ -224,22 +236,28 @@ __heaplib_calloc_with_coalesce(
 	{
 		/* Always just attempt to alloc, first */
 		e = __heaplib_calloc_within_region(h, vp, z, f);
+
+		/* If we couldn't alloc, or the heap is too fragmented, coalesce */
 		if(e != heaplib_error_none ||
-		   h->nodes_free > h->nodes_active && ((h->free * 100) / h->size >= 50))
+		  ((h->nodes_free > h->nodes_active) && ((h->free * 100) / h->size >= 50)))
 		{
 			/* If we couldn't alloc, attempt to coalesce since we know
 		 	 * there are ample bytes, they just may not be adjacent.
 			 * If the balance of the heap is tilted, attempt to adjust.
 		 	 */
 			if(e == heaplib_error_none)
+			{
 				fprintf(stdout, "FORCED COALESCE!\n");
+				fflush(stdout);
+			}
 
-			e = __heaplib_coalesce(h, f, &j);
+			__heaplib_coalesce(h, f, &j);
 		}
 
 		if(e == heaplib_error_none)
 		{
 			fprintf(stdout, "__heaplib_calloc_with_coalesce: yay!\n");
+			fflush(stdout);
 			return e;
 		}
 
@@ -247,6 +265,7 @@ __heaplib_calloc_with_coalesce(
 	}
 
 	fprintf(stdout, "__heaplib_calloc_with_coalesce: hmm!\n");
+	fflush(stdout);
 	return heaplib_error_fatal;
 }
 
@@ -270,11 +289,13 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 		*jp = 0;
 
 	fprintf(stdout, "__heaplib_coalesce: try\n");
+	fflush(stdout);
 
 	a = nil;
 	b = h->free_list;
 	if(b)
 		a = heaplib_free_next(b);
+
 	while(a && heaplib_region_within(a, h))
 	{
 		if(heaplib_node_next(b) != a)
@@ -293,10 +314,13 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 				heaplib_free_prev(heaplib_free_next(b)) = b;
 
 			fprintf(stdout, "coal: CONSUME size=%lu\n", b->size);
+			fflush(stdout);
+
 			b->size += heaplib_node_size(a) +
 					sizeof(*a) +
 					sizeof(*bf);
 			fprintf(stdout, "coal: CONSUME NOW size=%lu\n", b->size);
+			fflush(stdout);
 
 			bf = heaplib_node_footer(b);
 			bf->size = heaplib_node_size(b);
@@ -351,11 +375,13 @@ __heaplib_calloc_within_region(
 			   (heaplib_node_size(n) - z) < HEAPLIB_MIN_NODE)
 			{
 				fprintf(stdout, "node expand!\n");
+				fflush(stdout);
 				a = n;
 			}
 			else
 			{
 				fprintf(stdout, "node: split!\n");
+				fflush(stdout);
 
 				/* There's ample room to perform node split */
 				o = heaplib_node_size(n);
@@ -399,6 +425,7 @@ __heaplib_calloc_within_region(
 	else
 	{
 		fprintf(stdout, "found!\n");
+		fflush(stdout);
 
 		*vp = (vaddr_t)&a->payload[0];
 
