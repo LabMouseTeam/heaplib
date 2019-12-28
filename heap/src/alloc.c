@@ -174,7 +174,7 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 		/* Ensure this Region has enough free bytes (they may not
 		 * be contiguous)
 		 */
-		if(h->free >= z)
+		if(h->free >= z && __validate_region_request(h, z))
 		{
 			fprintf(stdout, "__heaplib_calloc: free!\n");
 			fflush(stdout);
@@ -239,7 +239,7 @@ __heaplib_calloc_with_coalesce(
 
 		/* If we couldn't alloc, or the heap is too fragmented, coalesce */
 		if(e != heaplib_error_none ||
-		  ((h->nodes_free > h->nodes_active) && ((h->free * 100) / h->size >= 50)))
+		  ((h->nodes_free > h->nodes_active) && ((h->free * 100) / h->size >= 60)))
 		{
 			/* If we couldn't alloc, attempt to coalesce since we know
 		 	 * there are ample bytes, they just may not be adjacent.

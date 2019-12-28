@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -8,7 +9,7 @@
 #include "heaplib/heaplib.h"
 
 #define MEMSZ (32 * 1024 )
-#define ALLOCSZ (2 * 1024)
+#define ALLOCSZ ((128 * 10))
 
 struct
 test_unit_t
@@ -19,6 +20,8 @@ test_unit_t
 };
 
 typedef struct test_unit_t test_unit_t;
+
+static boolean_t interrupted = False;
 
 boolean_t
 validate(test_unit_t * x)
@@ -40,33 +43,47 @@ validate(test_unit_t * x)
 	return True;
 }
 
+static void
+sighandler(int x)
+{
+	interrupted = True;
+}
+
 int
 main(int argc, char * argv[])
 {
 	test_unit_t x[32];
+	uint8_t * region;
 	vaddr_t f;
 	int i;
 	int r;
 	int t;
 	int sz;
 	int cap;
+	int allocs, frees;
+
+	signal(SIGINT, sighandler);
 
 	srandom(time(nil) ^ getpid());
 
 	printf("--- init %d ---\n", getpid());
 	fflush(stdout);
-	heaplib_region_add(calloc(1, MEMSZ), MEMSZ, heaplib_flags_internal);
+
+	region = (void * )calloc(1, MEMSZ);
+	heaplib_region_add((void*)region, MEMSZ /*/ 2*/, heaplib_flags_internal /*| heaplib_flags_smallreq*/);
+	// heaplib_region_add((void*)(region + (MEMSZ / 2)), MEMSZ / 2, heaplib_flags_internal /*| heaplib_flags_largereq*/);
 	printf("\n");
 	fflush(stdout);
 
 	memset(&x[0], 0, sizeof x);
 
+	allocs = 0; frees = 0;
 	i = 0;
 	cap = random() % nelem(x);
 	if(!cap)
 		cap = 1;
 
-	while(True)
+	while(!interrupted)
 	{
 		if(!x[i].a)
 		{
@@ -90,6 +107,8 @@ main(int argc, char * argv[])
 			printf("allocated: p=%p size=%ld c=%x\n\n", x[i].a, x[i].sz, x[i].c);
 			fflush(stdout);
 			memset((void * )x[i].a, x[i].c, x[i].sz);
+
+			allocs++;
 
 			heaplib_walk();
 		}
@@ -123,6 +142,7 @@ main(int argc, char * argv[])
 					x[r].a = nil;
 					x[r].sz = 0;
 					heaplib_free(&f, 0);
+					frees++;
 				}
 			}
 
@@ -138,9 +158,9 @@ main(int argc, char * argv[])
 
 	}
 
-	printf("\n--- END ---\n");
+	printf("\n--- %s ---\n", interrupted ? "interrupted" : "END");
 	fflush(stdout);
-	printf("got OOM?\n");
+	printf("got OOM? allocs=%d frees=%d\n", allocs, frees);
 	fflush(stdout);
 
 	heaplib_walk();

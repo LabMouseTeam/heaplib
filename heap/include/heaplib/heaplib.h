@@ -10,7 +10,7 @@
 #define HEAPLIB_B2C(x) ((x)/HEAPLIB_CHUNKSZ)+((((x)%HEAPLIB_CHUNKSZ)>0)?1:0)
 
 /* We require a minimum of 4 chunks per node */
-#define HEAPLIB_MIN_CHUNKS 	4
+#define HEAPLIB_MIN_CHUNKS 	8
 /* The minimum node size includes the minimum chunks required and the metadata
  * required to drive the free space.
  */
@@ -40,6 +40,9 @@ heaplib_flags_t
 	heaplib_flags_active =		(1 << 7), /**< Region is Active */
 	heaplib_flags_wiped =		(1 << 8), /**< Zero on free */
 	heaplib_flags_subregions =	(1 << 9), /**< Contains subregions */
+
+	heaplib_flags_smallreq =	(1 << 10), /**< Small requests only */
+	heaplib_flags_largereq =	(1 << 11), /**< Large requests only */
 
 	/* Flags for defining a Region */
 	heaplib_flags_regionmask =	(heaplib_flags_wiped |
@@ -206,6 +209,25 @@ heaplib_region_trylock(heaplib_region_t * h, boolean_t w)
 
 	/* Always return Again if we can't lock immediately. */
 	return heaplib_error_again;
+}
+
+#define HEAPLIB_REQUEST_THRESHOLD(x) ((x)->size / 16)
+
+__attribute__((always_inline)) __inline__ boolean_t
+__validate_region_request(heaplib_region_t * h, size_t z)
+{
+	if((h->flags & (heaplib_flags_smallreq|heaplib_flags_largereq)) == 0)
+	{
+		return True;
+	}
+
+	if((h->flags & heaplib_flags_smallreq) && z < HEAPLIB_REQUEST_THRESHOLD(h))
+	{
+		return True;
+	}
+
+	return ((h->flags & heaplib_flags_largereq) && z >= HEAPLIB_REQUEST_THRESHOLD(h)) || 
+		((h->flags & heaplib_flags_largereq) && z < HEAPLIB_REQUEST_THRESHOLD(h));
 }
 
 /* Region handling */
