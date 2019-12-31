@@ -60,7 +60,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 
 		if(a->magic != HEAPLIB_MAGIC)
 		{
-			PRINTF("error: heaplib magic failure at node=%d/%p\n", num, a);
+			PRINTF("error: magic failure at node=%d/%p\n", num, a);
 			heaplib_lock_unlock(&h->lock);
 			return heaplib_error_fatal;
 		}
@@ -70,15 +70,16 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 		{
 			if(!a->active)
 			{
-				PRINTF("error: free on a active node? %p\n", v);
+				PRINTF("error: free on active node? %p\n", v);
 				heaplib_lock_unlock(&h->lock);
 				return heaplib_error_fatal;
 			}
 
 			af = heaplib_node_footer(a);
-			if(a->magic != HEAPLIB_MAGIC || af->magic != HEAPLIB_MAGIC)
+			if(a->magic != HEAPLIB_MAGIC || 
+			   af->magic != HEAPLIB_MAGIC)
 			{
-				PRINTF("error: magic is corrupt for node=%p\n", a);
+				PRINTF("error: magic corrupt; node=%p\n", a);
 				heaplib_lock_unlock(&h->lock);
 				return heaplib_error_fatal;
 			}
