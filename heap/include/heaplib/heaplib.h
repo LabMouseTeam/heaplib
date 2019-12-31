@@ -179,7 +179,7 @@ heaplib_error_t
 	vbaddr_t __x;							\
 	__f = ((heaplib_footer_t * )(((vbaddr_t)(x)) - sizeof(*__f)));	\
 	__x = (((vbaddr_t)__f) - heaplib_node_size(__f));		\
-	(x) = (heaplib_node_t * )(__x - sizeof(heaplib_node_t));	\
+	(heaplib_node_t * )(__x - sizeof(heaplib_node_t));		\
 } while(0);
 
 /**

@@ -60,7 +60,6 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 		{
 			PRINTF("ERROR: heaplib magic failure at node=%d/%p\n", num, a);
 			heaplib_lock_unlock(&h->lock);
-			heaplib_lock_release(); // XXX lock testing
 			return heaplib_error_fatal;
 		}
 		num++;
@@ -69,10 +68,8 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 		{
 			if(!a->active)
 			{
-				// XXX warning! should be active!
 				PRINTF("ERROR: free on a active node? %p\n", v);
 				heaplib_lock_unlock(&h->lock);
-				heaplib_lock_release(); // XXX lock testing
 				return heaplib_error_fatal;
 			}
 
@@ -81,15 +78,10 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			{
 				PRINTF("ERROR: magic is corrupt for node=%p\n", a);
 				heaplib_lock_unlock(&h->lock);
-				heaplib_lock_release(); // XXX lock testing
 				return heaplib_error_fatal;
 			}
 
 			a->active = False;
-
-			// XXX The size can never be zero, dummy
-			// af->size = 0;
-			// a->size = 0;
 
 			/* Place the node back in the list */
 			if(!L)
@@ -116,31 +108,16 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			h->nodes_active -= 1;
 			h->nodes_free += 1;
 
-			/* Check if we need to immediately coalesce which may
-			 * help with heap fragmentation.
-			 */
-			// XXX this is silly change the macro to return not change 'x'
-			if((vbaddr_t)a <= h->addr)
-			{
-				L = nil;
-			}
-			else
-			{
-				L = a;
-				heaplib_node_prev(L);
-			}
-
 			/* Only force coalesce if we are surrounded, otherwise occurrence is too high */
+			L = heaplib_node_prev(a);
 			if((heaplib_region_within(a, h) && !heaplib_node_next(a)->active) &&
-			   (L && !L->active))
+			   (heaplib_region_within(L, h) && !L->active))
 			{
 				PRINTF("WARN: forced free coalesce\n");
 				__heaplib_coalesce(h, f, nil);
 			}
 
-			//PRINTF("free: heaplib_error_none\n");
 			heaplib_lock_unlock(&h->lock);
-			heaplib_lock_release(); // XXX lock testing
 			return heaplib_error_none;
 		}
 
@@ -150,7 +127,6 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 	/* Not found */
 	PRINTF("free: heaplib_error_fatal\n");
 	heaplib_lock_unlock(&h->lock);
-	heaplib_lock_release(); // XXX lock testing
 	return heaplib_error_fatal;
 }
 
@@ -231,7 +207,6 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 				PRINTF("__heaplib_calloc: calloc_w_coal\n");
 
 				heaplib_lock_unlock(&h->lock);
-				heaplib_lock_release(); // XXX lock testing
 				return e;
 			}
 		}
@@ -331,12 +306,6 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 
 	if(jp)
 		*jp = 0;
-
-#if 0
-	/* XXX */
-	return heaplib_error_none;
-	/* XXX */
-#endif
 
 	PRINTF("__heaplib_coalesce: try\n");
 
