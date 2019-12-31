@@ -30,6 +30,7 @@ heaplib_walk(void)
 	for(i = 0; i < nelem(regions); i++)
 	{
 		PRINTF("walk: region=%d\n", i);
+		/* This debugging routine always waits */
 		heaplib_lock_lock(&regions[i].lock);
 		__region_walk(&regions[i]);
 		heaplib_lock_unlock(&regions[i].lock);
@@ -114,7 +115,17 @@ heaplib_ptr2region(vaddr_t v, heaplib_region_t ** hp, heaplib_flags_t f)
 	e = heaplib_error_fatal;
 	for(i = 0; i < nelem(regions); i++)
 	{
-		heaplib_lock_lock(&regions[i].lock);
+		do
+		{
+			x = heaplib_lock_trylock(&regions[i].lock) == 0;
+		}
+		while(!x && (f & heaplib_flags_wait));
+		if(!x)
+		{
+			PRINTF("ERROR: can't wait for region lock in ptr2region\n");
+			e = heaplib_error_again;
+			break;
+		}
 
 		if(regions[i].flags & heaplib_flags_active)
 		{
