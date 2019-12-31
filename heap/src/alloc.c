@@ -116,8 +116,8 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			h->nodes_active -= 1;
 			h->nodes_free += 1;
 
+			//PRINTF("free: heaplib_error_none\n");
 			heaplib_lock_unlock(&h->lock);
-			PRINTF("free: heaplib_error_none\n");
 			heaplib_lock_release(); // XXX lock testing
 			return heaplib_error_none;
 		}
@@ -126,8 +126,8 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 	}
 
 	/* Not found */
-	heaplib_lock_unlock(&h->lock);
 	PRINTF("free: heaplib_error_fatal\n");
+	heaplib_lock_unlock(&h->lock);
 	heaplib_lock_release(); // XXX lock testing
 	return heaplib_error_fatal;
 }
@@ -286,8 +286,6 @@ __heaplib_calloc_with_coalesce(
 			PRINTF("__heaplib_calloc_with_coalesce: yay!\n");
 			return e;
 		}
-
-		// e = __heaplib_coalesce(h, f, &j);
 	}
 
 	PRINTF("__heaplib_calloc_with_coalesce: hmm!\n");

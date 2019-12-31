@@ -88,7 +88,7 @@ __region_walk(heaplib_region_t * h)
 void
 heaplib_lock_release(void)
 {
-#if 1 // XXX when 1: tesitng global lock
+#if 0 // XXX when 1: tesitng global lock
 	/* use this to test the global lock */
 	heaplib_lock_unlock(&heaplib_region_lock);
 #endif
@@ -114,16 +114,24 @@ heaplib_ptr2region(vaddr_t v, heaplib_region_t ** hp, heaplib_flags_t f)
 	e = heaplib_error_fatal;
 	for(i = 0; i < nelem(regions); i++)
 	{
-		a = regions[i].addr;
-		if((vbaddr_t)v >= a && (vbaddr_t)v < (a + regions[i].size))
+		heaplib_lock_lock(&regions[i].lock);
+
+		if(regions[i].flags & heaplib_flags_active)
 		{
-			e = heaplib_error_none;
-			*hp = &regions[i];
-			break;
+			a = regions[i].addr;
+			if((vbaddr_t)v >= a && (vbaddr_t)v < (a + regions[i].size))
+			{
+				e = heaplib_error_none;
+				*hp = &regions[i];
+				/* Don't unlock */
+				break;
+			}
 		}
+
+		heaplib_lock_unlock(&regions[i].lock);
 	}
 
-#if 0 // XXX when 0: test global lock
+#if 1 // XXX when 0: test global lock
 	heaplib_lock_unlock(&heaplib_region_lock);
 #endif
 	return e;
@@ -171,7 +179,7 @@ heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 		}
 	}
 
-#if 0 // XXX when 0: test global lock
+#if 1 // XXX when 0: test global lock
 	heaplib_lock_unlock(&heaplib_region_lock);
 #endif
 	return e;
@@ -246,7 +254,7 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	b = (*rp)->addr;
 	heaplib_lock_unlock(&(*rp)->lock);
 
-#if 0 // XXX when 0: test global lock
+#if 1 // XXX when 0: test global lock
 	/* Second thing we do is attempt to lock the Master. Yield to flags */
 	do {
 		x = heaplib_lock_trylock(&heaplib_region_lock) == 0;
@@ -283,34 +291,28 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	}
 
 	/* No other region found */
-	if(k == -1)
+	x = False;
+	*rp = nil;
+	if(k > -1)
 	{
-#if 1 // XXX this should always be enforced 
-		heaplib_lock_unlock(&heaplib_region_lock);
-#endif
-		return heaplib_error_fatal;
-	}
+		/* Found! Now, attempt to hold the Region's lock */
+		*rp = &regions[k];
 
-	/* Found! Now, attempt to hold the Region's lock */
-	*rp = &regions[k];
-
-	do {
-		x = heaplib_lock_trylock(&regions[k].lock) == 0;
+		do {
+			x = heaplib_lock_trylock(&regions[k].lock) == 0;
+		}
+		while(!x && (f & heaplib_flags_wait));
 	}
-	while(!x && (f & heaplib_flags_wait));
 
 	/* We're OK to unlock the master regardless of if we succeeded. */
 #if 1 // XXX always unlock here
 	heaplib_lock_unlock(&heaplib_region_lock);
 #endif
 
-	if(!x)
-	{
-		*rp = nil;
-		return heaplib_error_again;
-	}
+	if(!x && k > -1)
+		return heaplib_error_fatal;
 
-	return heaplib_error_none;
+	return (k == -1) ? heaplib_error_again : heaplib_error_none ;
 }
 
 /**
