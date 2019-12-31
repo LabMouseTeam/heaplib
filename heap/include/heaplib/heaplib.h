@@ -253,4 +253,3 @@ extern boolean_t heaplib_ptr2node(heaplib_region_t *, vaddr_t, heaplib_node_t **
 /* Debug */
 extern void heaplib_walk(void);
 
-extern void heaplib_lock_release(void); // XXX lock testing
