@@ -38,6 +38,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 
 	/* Make sure the pointer is valid */
 	PRINTF("free: find region\n");
+
 	e = heaplib_ptr2region(v, &h, f);
 	if(e != heaplib_error_none)
 	{
@@ -46,6 +47,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 	}
 
 	PRINTF("free: spinning\n");
+
 	/* The Region is returned locked */
 	num = 0;
 	L = nil;
@@ -58,7 +60,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 
 		if(a->magic != HEAPLIB_MAGIC)
 		{
-			PRINTF("ERROR: heaplib magic failure at node=%d/%p\n", num, a);
+			PRINTF("error: heaplib magic failure at node=%d/%p\n", num, a);
 			heaplib_lock_unlock(&h->lock);
 			return heaplib_error_fatal;
 		}
@@ -68,7 +70,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 		{
 			if(!a->active)
 			{
-				PRINTF("ERROR: free on a active node? %p\n", v);
+				PRINTF("error: free on a active node? %p\n", v);
 				heaplib_lock_unlock(&h->lock);
 				return heaplib_error_fatal;
 			}
@@ -76,7 +78,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			af = heaplib_node_footer(a);
 			if(a->magic != HEAPLIB_MAGIC || af->magic != HEAPLIB_MAGIC)
 			{
-				PRINTF("ERROR: magic is corrupt for node=%p\n", a);
+				PRINTF("error: magic is corrupt for node=%p\n", a);
 				heaplib_lock_unlock(&h->lock);
 				return heaplib_error_fatal;
 			}
@@ -387,7 +389,7 @@ __heaplib_calloc_within_region(
 	{
 		if(n->active)
 		{
-			PRINTF("ERROR: active node in the free list!\n");
+			PRINTF("error: active node in the free list!\n");
 			return heaplib_error_fatal;
 		}
 

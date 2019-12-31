@@ -30,7 +30,11 @@ heaplib_lock_trylock(heaplib_lock_t * x) {
 }
 
 /* Debugging and printing */
-#define PRINTF( ... ) thread_printf(__VA_ARGS__)
+#ifdef DEBUG
+# define PRINTF( ... ) thread_printf(__VA_ARGS__)
+#else
+# define PRINTF( ... )
+#endif
 
 /* Scheduling */
 #define SCHEDULE_TASK(x) /* Nothing to do on Linux */
