@@ -167,20 +167,18 @@ heaplib_error_t
 /**
  * \brief Rewind through the previous heaplib list.
  *
- * XXX change this to RETURN the prev node
- *
  * \param x A heaplib node or the end of the heaplib region.
  *
  * \author Don A. Bailey <donb@labmou.se>
  * \date December 19, 2019
  */
-#define heaplib_node_prev(x) do {					\
+#define heaplib_node_prev(x) ({						\
 	heaplib_footer_t * __f;						\
 	vbaddr_t __x;							\
 	__f = ((heaplib_footer_t * )(((vbaddr_t)(x)) - sizeof(*__f)));	\
 	__x = (((vbaddr_t)__f) - heaplib_node_size(__f));		\
 	(heaplib_node_t * )(__x - sizeof(heaplib_node_t));		\
-} while(0);
+})
 
 /**
  * \brief Forward through the heaplib list.
