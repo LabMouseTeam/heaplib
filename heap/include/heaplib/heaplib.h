@@ -87,7 +87,7 @@ heaplib_node_t
 		size_t size;
 	};
 
-	union {
+	// union {
 		struct {
 			task_t task;
 			union {
@@ -95,12 +95,16 @@ heaplib_node_t
 				size_t flags;
 			};
 		} pc_t;
+	// };
 
+	// union {
 		struct {
 			heaplib_node_t * next;
 			heaplib_node_t * prev;
 		} free_t;
-	};
+	// };
+
+	heaplib_magic_t magic;
 
 	uint8_t payload[];
 
@@ -247,3 +251,4 @@ extern boolean_t heaplib_ptr2node(heaplib_region_t *, vaddr_t, heaplib_node_t **
 /* Debug */
 extern void heaplib_walk(void);
 
+extern void heaplib_lock_release(void); // XXX lock testing

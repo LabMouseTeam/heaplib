@@ -26,8 +26,11 @@ typedef pthread_mutex_t heaplib_lock_t;
 #define heaplib_lock_unlock(x) 	pthread_mutex_unlock((x));
 __attribute__((always_inline)) __inline__ int
 heaplib_lock_trylock(heaplib_lock_t * x) {
-	return pthread_mutex_trylock(x);
+	return pthread_mutex_lock(x);
 }
+
+/* Debugging and printing */
+#define PRINTF( ... ) thread_printf(__VA_ARGS__)
 
 /* Scheduling */
 #define SCHEDULE_TASK(x) /* Nothing to do on Linux */
@@ -38,4 +41,5 @@ heaplib_lock_trylock(heaplib_lock_t * x) {
 #define NREGIONS 4
 
 extern void platform_yield(void);
+extern void thread_printf(const char *, ... );
 

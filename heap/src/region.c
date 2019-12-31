@@ -15,23 +15,29 @@ heaplib_walk(void)
 	boolean_t x;
 	int i;
 
-	/* First thing we do is attempt to lock the Master. Yield to flags */
+	/* First thing we do is attempt to lock the Master. */
 	do
 	{
 		x = heaplib_lock_trylock(&heaplib_region_lock) == 0;
 	} 
 	while(!x);
 	if(!x)
+	{
+		PRINTF("heaplib_walk: can't lock?\n");
 		return;
+	}
 
 	for(i = 0; i < nelem(regions); i++)
 	{
-		fprintf(stdout, "walk: region=%d\n", i);
-		fflush(stdout);
+		PRINTF("walk: region=%d\n", i);
+		heaplib_lock_lock(&regions[i].lock);
 		__region_walk(&regions[i]);
+		heaplib_lock_unlock(&regions[i].lock);
 	}
 
+#if 1 // XXX always set
 	heaplib_lock_unlock(&heaplib_region_lock);
+#endif
 }
 
 static void
@@ -39,8 +45,7 @@ __region_walk(heaplib_region_t * h)
 {
 	heaplib_node_t * n;
 
-	fprintf(stdout, "walk region: %p free=%ld size=%ld addr=%p flags=%x free_list=%p nodes_free=%ld nodes_active=%ld\n",
-		h,
+	PRINTF("walk region: free=%ld size=%ld addr=%p flags=%x free_list=%p nodes_free=%ld nodes_active=%ld\n",
 		h->free,
 		h->size,
 		h->addr,
@@ -48,19 +53,15 @@ __region_walk(heaplib_region_t * h)
 		h->free_list,
 		h->nodes_free,
 		h->nodes_active);
-	fflush(stdout);
 
 	n = (heaplib_node_t * )h->addr;
+	PRINTF("walk region addr=%p\n", n);
+
 	while(heaplib_region_within(n, h))
 	{
-		if(heaplib_node_size(n) == 0)
-		{
-			break;
-		}
-
 		if(n->active)
 		{
-			fprintf(stdout, "walk: node=%p payload=%p active=%d size=%ld task=%ld refs=%x flags=%lx\n",
+			PRINTF("walk: node=%p payload=%p active=%d size=%ld task=%ld refs=%x flags=%lx\n",
 				n,
 				&n->payload[0],
 				n->active,
@@ -68,22 +69,29 @@ __region_walk(heaplib_region_t * h)
 				n->pc_t.task,
 				n->pc_t.refs,
 				n->pc_t.flags);
-			fflush(stdout);
 		}
 		else
 		{
-			fprintf(stdout, "walk: node=%p payload=%p active=%d size=%ld next=%p prev=%p\n",
+			PRINTF("walk: node=%p payload=%p active=%d size=%ld next=%p prev=%p\n",
 				n,
 				&n->payload[0],
 				n->active,
 				heaplib_node_size(n),
 				n->free_t.next,
 				n->free_t.prev);
-			fflush(stdout);
 		}
 
 		n = heaplib_node_next(n);
 	}
+}
+
+void
+heaplib_lock_release(void)
+{
+#if 1 // XXX when 1: tesitng global lock
+	/* use this to test the global lock */
+	heaplib_lock_unlock(&heaplib_region_lock);
+#endif
 }
 
 heaplib_error_t
@@ -115,7 +123,9 @@ heaplib_ptr2region(vaddr_t v, heaplib_region_t ** hp, heaplib_flags_t f)
 		}
 	}
 
+#if 0 // XXX when 0: test global lock
 	heaplib_lock_unlock(&heaplib_region_lock);
+#endif
 	return e;
 }
 
@@ -135,6 +145,7 @@ heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 	boolean_t x;
 	int i;
 
+#if 1 // XXX this must always be set, even during global lock testing
 	/* First thing we do is attempt to lock the Master. Yield to flags */
 	do
 	{
@@ -142,7 +153,11 @@ heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 	} 
 	while(!x && (f & heaplib_flags_wait));
 	if(!x)
+	{
+		PRINTF("ERROR: region_find_first: cant lock\n");
 		return heaplib_error_again;
+	}
+#endif
 
 	e = heaplib_error_fatal;
 	/* Once locked, search for the next matching Region */
@@ -156,7 +171,9 @@ heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 		}
 	}
 
+#if 0 // XXX when 0: test global lock
 	heaplib_lock_unlock(&heaplib_region_lock);
+#endif
 	return e;
 }
 
@@ -170,8 +187,7 @@ __region_test_and_lock(heaplib_region_t * rp, heaplib_flags_t f)
 {
 	boolean_t x;
 
-	fprintf(stdout, "region\n");
-	fflush(stdout);
+	PRINTF("thread=%ld: region\n", pthread_self());
 
 	do {
 		x = heaplib_lock_trylock(&(rp)->lock) == 0;
@@ -179,8 +195,7 @@ __region_test_and_lock(heaplib_region_t * rp, heaplib_flags_t f)
 	while(!x && (f & heaplib_flags_wait));
 	if(!x)
 	{
-		fprintf(stdout, "region cantlock\n");
-		fflush(stdout);
+		PRINTF("ERROR: __region_test_and_lock cantlock\n");
 		return heaplib_error_again;
 	}
 
@@ -231,6 +246,7 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	b = (*rp)->addr;
 	heaplib_lock_unlock(&(*rp)->lock);
 
+#if 0 // XXX when 0: test global lock
 	/* Second thing we do is attempt to lock the Master. Yield to flags */
 	do {
 		x = heaplib_lock_trylock(&heaplib_region_lock) == 0;
@@ -238,6 +254,7 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	while(!x && (f & heaplib_flags_wait));
 	if(!x)
 		return heaplib_error_again;
+#endif
 
 	/* With the Master lock held, we can read the entire table without
 	 * holding a lock, because the Regions themselves cannot be altered.
@@ -268,7 +285,9 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	/* No other region found */
 	if(k == -1)
 	{
+#if 1 // XXX this should always be enforced 
 		heaplib_lock_unlock(&heaplib_region_lock);
+#endif
 		return heaplib_error_fatal;
 	}
 
@@ -281,7 +300,9 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	while(!x && (f & heaplib_flags_wait));
 
 	/* We're OK to unlock the master regardless of if we succeeded. */
+#if 1 // XXX always unlock here
 	heaplib_lock_unlock(&heaplib_region_lock);
+#endif
 
 	if(!x)
 	{
@@ -368,7 +389,7 @@ heaplib_region_add(vaddr_t a, size_t sz, heaplib_flags_t f)
 		heaplib_lock_init(&h->lock);
 		h->flags = f | heaplib_flags_active;
 		h->free = sz - (sizeof(*n) + sizeof(*nf));
-		h->size = sz - (sizeof(*n) + sizeof(*nf));
+		h->size = sz;
 		h->addr = (vbaddr_t)a;
 		h->nodes_active = 0;
 		h->nodes_free = 1;
@@ -390,9 +411,10 @@ __heaplib_node_init(heaplib_region_t * h, heaplib_node_t * n)
 {
 	heaplib_footer_t * f;
 
-	n->size = h->size;
+	n->size = h->free;
 	n->free_t.next = nil;
 	n->free_t.prev = nil;
+	n->magic = HEAPLIB_MAGIC;
 
 	f = heaplib_node_footer(n);
 	f->magic = HEAPLIB_MAGIC;
