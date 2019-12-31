@@ -167,6 +167,8 @@ heaplib_error_t
 /**
  * \brief Rewind through the previous heaplib list.
  *
+ * XXX change this to RETURN the prev node
+ *
  * \param x A heaplib node or the end of the heaplib region.
  *
  * \author Don A. Bailey <donb@labmou.se>

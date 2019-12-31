@@ -116,6 +116,28 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			h->nodes_active -= 1;
 			h->nodes_free += 1;
 
+			/* Check if we need to immediately coalesce which may
+			 * help with heap fragmentation.
+			 */
+			// XXX this is silly change the macro to return not change 'x'
+			if((vbaddr_t)a <= h->addr)
+			{
+				L = nil;
+			}
+			else
+			{
+				L = a;
+				heaplib_node_prev(L);
+			}
+
+			/* Only force coalesce if we are surrounded, otherwise occurrence is too high */
+			if((heaplib_region_within(a, h) && !heaplib_node_next(a)->active) &&
+			   (L && !L->active))
+			{
+				PRINTF("WARN: forced free coalesce\n");
+				__heaplib_coalesce(h, f, nil);
+			}
+
 			//PRINTF("free: heaplib_error_none\n");
 			heaplib_lock_unlock(&h->lock);
 			heaplib_lock_release(); // XXX lock testing
