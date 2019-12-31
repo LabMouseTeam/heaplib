@@ -12,8 +12,9 @@
 
 #define NTHREADS 16
 
+#define BIGMEMSZ (512 * 1024 )
 #define MEMSZ (32 * 1024 )
-#define ALLOCSZ ((128 * 10))
+#define ALLOCSZ ((128 * 14))
 
 struct
 test_unit_t
@@ -76,6 +77,10 @@ main(int argc, char * argv[])
 	region = (void * )calloc(1, MEMSZ);
 	heaplib_region_add((void*)region, MEMSZ /*/ 2*/, heaplib_flags_internal /*| heaplib_flags_smallreq*/);
 	// heaplib_region_add((void*)(region + (MEMSZ / 2)), MEMSZ / 2, heaplib_flags_internal /*| heaplib_flags_largereq*/);
+
+	/* XXX add second region for testing with no flags */
+	region = (void * )calloc(1, BIGMEMSZ);
+	heaplib_region_add((void*)region, BIGMEMSZ /*/ 2*/, 0);
 
 	pthread_mutex_init(&lock, nil);
 	pthread_mutex_init(&stats, nil);

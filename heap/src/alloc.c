@@ -160,7 +160,6 @@ heaplib_calloc(vaddr_t * vp, size_t x, size_t y, heaplib_flags_t f)
 
 	e = __heaplib_calloc(vp, z, f);
 	PRINTF("__heaplib_calloc: thread=%ld e=%d *vp=%p sz=%ld \n", pthread_self(), e, *vp, z);
-	heaplib_walk();
 	return e;
 }
 
