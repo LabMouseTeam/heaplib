@@ -47,7 +47,7 @@ validate(test_unit_t * x)
 	{
 		if(b[i] != x->c)
 		{
-			PRINTF("%ld: validation failed on x=%p offset=%d c=%x\n", pthread_self(), x, i, x->c);
+			PRINTF("%ld: error: validation failed on x=%p offset=%d c=%x\n", pthread_self(), x, i, x->c);
 			return False;
 		}
 	}
