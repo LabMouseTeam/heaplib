@@ -5,10 +5,16 @@ static heaplib_region_t regions[NREGIONS];
 static heaplib_lock_t heaplib_region_lock;
 
 static void __region_walk(heaplib_region_t * );
-static void __heaplib_node_init(heaplib_region_t *, heaplib_node_t * );
+
 static heaplib_error_t __region_test_and_lock(
 				heaplib_region_t *,
 				heaplib_flags_t);
+static heaplib_error_t __region_scan_next_and_lock(
+				heaplib_region_t **,
+				vbaddr_t,
+				heaplib_flags_t);
+
+static void __heaplib_node_init(heaplib_region_t *, heaplib_node_t * );
 
 void
 heaplib_init(void)
@@ -237,11 +243,10 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 {
 	heaplib_error_t e;
 	vbaddr_t b;
-	int i;
-	int j;
-	int k;
 
-	/* First thing we do is release the current lock. */
+	/* First thing we do is release the current lock, which *must* be done
+	 * without first holding the Master lock.
+	 */
 	b = (*rp)->addr;
 	heaplib_lock_unlock(&(*rp)->lock);
 
@@ -252,54 +257,92 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 		return e;
 	}
 
-	/* With the Master lock held, we can read the entire table without
-	 * holding a lock, because the Regions themselves cannot be altered.
-	 * So find the next viable candidate.
+	/* This function will search for the next viable Region that matches
+	 * our desired Flags, or it will return nothing. It's notable that
+	 * this function will *not* return EAGAIN if we can't lock a Region
+	 * because of a Flags issue (wait failure, etc). We only care if the
+	 * attempt succeeded or not. If the caller wants to wait, they should
+	 * explicitly ask to.
 	 */
-	k = -1;
-	for(i = 0; i < nelem(regions); i++)
-	{
-		if(b >= regions[i].addr)
-		{
-			continue;
-		}
+	e = __region_scan_next_and_lock(rp, b, f);
 
-		k = i;
-		/* Now test for the closest match */
-		for(j = i + 1; j < nelem(regions); j++)
+	heaplib_lock_unlock(&heaplib_region_lock);
+
+	return e;
+}
+
+/**
+ * \brief Scan for the next viable Region by ascending address.
+ *
+ * \warning Must be called with the master locked.
+ *
+ * \date January 1, 2020
+ * \author Don A. Bailey <donb@labmou.se>
+ */
+static heaplib_error_t
+__region_scan_next_and_lock(heaplib_region_t ** hp, vbaddr_t b, heaplib_flags_t f)
+{
+	heaplib_region_t * h;
+	heaplib_error_t e;
+	vbaddr_t n;
+	int i;
+	int j;
+
+	*hp = nil;
+
+	/* Search for a viable Next Region until we run out of Regions */
+	do
+	{
+		n = b;
+		h = nil;
+		for(i = 0; i < nelem(regions); i++)
 		{
-			if(regions[i].addr >= regions[j].addr)
+			/* We order by increasing base address */
+			if(b >= regions[i].addr)
 			{
 				continue;
 			}
 
-			k = j;
+			/* Now, ensure the 'n'ew address is lower in memory than
+		 	* anything new we'd like to test.
+		 	*/
+			if(n > b && regions[i].addr >= n)
+			{
+				continue;
+			}
+
+			n = regions[i].addr;
+			/* Now test for the closest match */
+			for(j = i + 1; j < nelem(regions); j++)
+			{
+				if((regions[j].addr < n) && 
+				   (regions[j].addr > b))
+				{
+					n = regions[j].addr;
+					h = &regions[i];
+				}
+			}
+		}
+
+		/* No suitable Region above our Base was found */
+		if(!h)
 			break;
+
+		/* Save the base address for the next round */
+		b = h->addr;
+
+		/* If we found our Region, return */
+		e = __region_test_and_lock(h, f);
+		if(e == heaplib_error_none)
+		{
+			/* We are locked and ready */
+			*hp = h;
+			return e;
 		}
 	}
+	while(True);
 
-	/* No other region found */
-	*rp = nil;
-	if(k > -1)
-	{
-		/* Found! Now, attempt to hold the Region's lock */
-		*rp = &regions[k];
-
-		e = heaplib_region_lock_flags(&regions[k].lock, f);
-	}
-
-	/* We're OK to unlock the master regardless of if we succeeded. */
-	heaplib_lock_unlock(&heaplib_region_lock);
-
-	/* We found a matching Region, but couldn't lock it */
-	if(k > -1 && e != heaplib_error_none)
-	{
-		return e;
-	}
-
-	/* We don't care what 'e' is, only the state of k matters */
-
-	return (k == -1) ? heaplib_error_again : heaplib_error_none ;
+	return heaplib_error_fatal;
 }
 
 /**
@@ -311,7 +354,8 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 heaplib_error_t
 heaplib_region_delete(heaplib_region_t * h)
 {
-	
+	/* XXX use the _restrict flag */
+	/* XXX dont do any more allocation when this flag is set */
 }
 
 /**
