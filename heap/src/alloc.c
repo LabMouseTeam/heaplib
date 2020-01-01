@@ -120,6 +120,12 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 				__heaplib_coalesce(h, f, nil);
 			}
 
+			/* If all memory is free'd and we're restricted,
+			 * perform the actual Delete operation. Even if we
+			 * delete the Region, the lock stays live.
+			 */
+			__heaplib_region_delete_internal(h);
+
 			heaplib_lock_unlock(&h->lock);
 			return heaplib_error_none;
 		}

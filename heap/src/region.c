@@ -352,6 +352,34 @@ __region_scan_next_and_lock(heaplib_region_t ** hp, vbaddr_t b, heaplib_flags_t 
 }
 
 /**
+ * \brief Perform the actual delete function
+ *
+ * If all of the allocations are free'd, perform the actual Delete. This should
+ * be called by the free function.
+ *
+ * \warning This should be called with the Region locked.
+ * \warning This should be called by free()
+ *
+ * \date January 1, 2020
+ * \author Don A. Bailey <donb@labmou.se>
+ */
+void
+__heaplib_region_delete_internal(heaplib_region_t * h)
+{
+	if((h->flags & heaplib_flags_restrict) &&
+	   (h->free == h->size) &&
+	   (h->nodes_active == 0))
+	{
+		h->free_list = nil;
+		h->nodes_free = 0;
+		h->addr = nil;
+		h->flags = 0;
+		h->size = 0;
+		h->free = 0;
+	}
+}
+
+/**
  * \brief Delete a region from memory.
  *
  * \author Don A. Bailey <donb@labmou.se>
@@ -360,8 +388,37 @@ __region_scan_next_and_lock(heaplib_region_t ** hp, vbaddr_t b, heaplib_flags_t 
 heaplib_error_t
 heaplib_region_delete(heaplib_region_t * h)
 {
-	/* XXX use the _restrict flag */
-	/* XXX dont do any more allocation when this flag is set */
+	heaplib_error_t e;
+	int i;
+
+	e = heaplib_region_lock_flags(&heaplib_region_lock, heaplib_flags_wait);
+	if(e != heaplib_error_none)
+	{
+		PRINTF("error: heaplib_region_add: can't lock master\n");
+		return e;
+	}
+
+	/* Make sure the Region is real */
+	e = heaplib_error_fatal;
+	for(i = 0; i < nelem(regions); i++)
+	{
+		/* Found it. Because we hold the Master lock, we can change
+		 * the flags even if another thread holds the lock for this
+		 * Region. If another thread is allocating within this Region,
+		 * that's fine. We just won't see any allocations after this
+		 * action.
+		 */
+		if(h == &regions[i])
+		{
+			h->flags |= heaplib_flags_restrict;
+			e = heaplib_error_none;
+			break;
+		}
+	}
+
+	heaplib_lock_unlock(&heaplib_region_lock);
+
+	return e;
 }
 
 /**

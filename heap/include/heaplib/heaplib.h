@@ -254,6 +254,7 @@ __validate_region_request(heaplib_region_t * h, size_t z)
 }
 
 /* Region handling */
+extern void __heaplib_region_delete_internal(heaplib_region_t * );
 extern heaplib_error_t heaplib_region_delete(heaplib_region_t * );
 extern heaplib_error_t heaplib_region_add(vaddr_t, size_t, heaplib_flags_t);
 extern heaplib_error_t heaplib_region_find_next(heaplib_region_t **, heaplib_flags_t);
