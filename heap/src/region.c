@@ -103,6 +103,12 @@ __region_walk(heaplib_region_t * h)
 	}
 }
 
+/**
+ * \brief Convert a heap pointer to the Region that supports it.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 22, 2019
+ */
 heaplib_error_t
 heaplib_ptr2region(vaddr_t v, heaplib_region_t ** hp, heaplib_flags_t f)
 {
