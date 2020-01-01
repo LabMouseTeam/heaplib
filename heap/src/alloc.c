@@ -266,7 +266,8 @@ __heaplib_calloc_with_coalesce(
 
 		/* If we couldn't alloc, or the heap is too fragmented, coalesce */
 		if(e != heaplib_error_none ||
-		  ((h->nodes_free > h->nodes_active) && ((h->free * 100) / h->size >= 60)))
+		  ((h->nodes_free > h->nodes_active) && 
+		  ((h->free * 100) / h->size >= 60)))
 		{
 			/* If we couldn't alloc, attempt to coalesce since we know
 		 	 * there are ample bytes, they just may not be adjacent.

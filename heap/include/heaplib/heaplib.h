@@ -141,6 +141,25 @@ heaplib_error_t
 #define heaplib_free_prev(x) ((x)->free_t.prev)
 
 /**
+ * \brief Lock a Region or Master according to flags
+ *
+ * \param x A heaplib Region or Master lock
+ * \param f Flags for locking.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 31, 2019
+ */
+#define heaplib_region_lock_flags(x, f) ({				\
+	boolean_t __x;							\
+        /* Attempt to lock the Region or Master. Yield to flags */	\
+        do {    							\
+                __x = heaplib_lock_trylock((x)) == 0;			\
+        }								\
+        while(!__x && ((f) & heaplib_flags_wait));			\
+        (__x == False) ? heaplib_error_again : heaplib_error_none;	\
+})
+
+/**
  * \brief Ensure a Node is within the boundaries of a Region
  *
  * \param x A heaplib node 
@@ -235,7 +254,7 @@ __validate_region_request(heaplib_region_t * h, size_t z)
 }
 
 /* Region handling */
-extern heaplib_error_t heaplib_region_delete(heaplib_region_t);
+extern heaplib_error_t heaplib_region_delete(heaplib_region_t * );
 extern heaplib_error_t heaplib_region_add(vaddr_t, size_t, heaplib_flags_t);
 extern heaplib_error_t heaplib_region_find_next(heaplib_region_t **, heaplib_flags_t);
 extern heaplib_error_t heaplib_region_find_first(heaplib_region_t **, heaplib_flags_t);

@@ -11,22 +11,28 @@ static heaplib_error_t __region_test_and_lock(
 				heaplib_flags_t);
 
 void
+heaplib_init(void)
+{
+	int i;
+
+	for(i = 0; i < nelem(regions); i++)
+	{
+		heaplib_lock_init(&regions[i].lock);
+	}
+
+	heaplib_lock_init(&heaplib_region_lock);
+}
+
+void
 heaplib_walk(void)
 {
 	boolean_t x;
 	int i;
 
 	/* First thing we do is attempt to lock the Master. */
-	do
-	{
-		x = heaplib_lock_trylock(&heaplib_region_lock) == 0;
-	} 
-	while(!x);
-	if(!x)
-	{
-		PRINTF("heaplib_walk: can't lock?\n");
-		return;
-	}
+
+	/* This will always succeed because we are guaranteed to wait. */
+	heaplib_region_lock_flags(&heaplib_region_lock, heaplib_flags_wait);
 
 	for(i = 0; i < nelem(regions); i++)
 	{
@@ -95,31 +101,24 @@ heaplib_error_t
 heaplib_ptr2region(vaddr_t v, heaplib_region_t ** hp, heaplib_flags_t f)
 {
 	heaplib_error_t e;
-	boolean_t x;
 	vbaddr_t a;
 	int i;
 
 	/* First thing we do is attempt to lock the Master. Yield to flags */
-	do
+	e = heaplib_region_lock_flags(&heaplib_region_lock, f);
+	if(e != heaplib_error_none)
 	{
-		x = heaplib_lock_trylock(&heaplib_region_lock) == 0;
-	} 
-	while(!x && (f & heaplib_flags_wait));
-	if(!x)
+		PRINTF("error: can't lock the master lock\n");
 		return heaplib_error_again;
+	}
 
 	e = heaplib_error_fatal;
 	for(i = 0; i < nelem(regions); i++)
 	{
-		do
-		{
-			x = heaplib_lock_trylock(&regions[i].lock) == 0;
-		}
-		while(!x && (f & heaplib_flags_wait));
-		if(!x)
+		e = heaplib_region_lock_flags(&regions[i].lock, f);
+		if(e != heaplib_error_none)
 		{
 			PRINTF("ERROR: can't region lock in ptr2region\n");
-			e = heaplib_error_again;
 			break;
 		}
 
@@ -160,15 +159,11 @@ heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 	int i;
 
 	/* First thing we do is attempt to lock the Master. Yield to flags */
-	do
-	{
-		x = heaplib_lock_trylock(&heaplib_region_lock) == 0;
-	} 
-	while(!x && (f & heaplib_flags_wait));
-	if(!x)
+	e = heaplib_region_lock_flags(&heaplib_region_lock, f);
+	if(e != heaplib_error_none)
 	{
 		PRINTF("ERROR: region_find_first: cant lock\n");
-		return heaplib_error_again;
+		return e;
 	}
 
 	e = heaplib_error_fatal;
@@ -195,18 +190,13 @@ heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 static heaplib_error_t
 __region_test_and_lock(heaplib_region_t * rp, heaplib_flags_t f)
 {
-	boolean_t x;
+	heaplib_error_t e;
 
-	PRINTF("thread=%ld: region\n", pthread_self());
-
-	do {
-		x = heaplib_lock_trylock(&(rp)->lock) == 0;
-	}
-	while(!x && (f & heaplib_flags_wait));
-	if(!x)
+	e = heaplib_region_lock_flags(&(rp)->lock, f);
+	if(e != heaplib_error_none)
 	{
 		PRINTF("ERROR: __region_test_and_lock cantlock\n");
-		return heaplib_error_again;
+		return e;
 	}
 
 	/* The Region must be active and must not be restricted */
@@ -246,7 +236,6 @@ heaplib_error_t
 heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 {
 	heaplib_error_t e;
-	boolean_t x;
 	vbaddr_t b;
 	int i;
 	int j;
@@ -256,13 +245,12 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	b = (*rp)->addr;
 	heaplib_lock_unlock(&(*rp)->lock);
 
-	/* Second thing we do is attempt to lock the Master. Yield to flags */
-	do {
-		x = heaplib_lock_trylock(&heaplib_region_lock) == 0;
+	e = heaplib_region_lock_flags(&heaplib_region_lock, f);
+	if(e != heaplib_error_none)
+	{
+		PRINTF("error: heaplib_region_find_next: cant lock master\n");
+		return e;
 	}
-	while(!x && (f & heaplib_flags_wait));
-	if(!x)
-		return heaplib_error_again;
 
 	/* With the Master lock held, we can read the entire table without
 	 * holding a lock, because the Regions themselves cannot be altered.
@@ -291,24 +279,25 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
 	}
 
 	/* No other region found */
-	x = False;
 	*rp = nil;
 	if(k > -1)
 	{
 		/* Found! Now, attempt to hold the Region's lock */
 		*rp = &regions[k];
 
-		do {
-			x = heaplib_lock_trylock(&regions[k].lock) == 0;
-		}
-		while(!x && (f & heaplib_flags_wait));
+		e = heaplib_region_lock_flags(&regions[k].lock, f);
 	}
 
 	/* We're OK to unlock the master regardless of if we succeeded. */
 	heaplib_lock_unlock(&heaplib_region_lock);
 
-	if(!x && k > -1)
-		return heaplib_error_fatal;
+	/* We found a matching Region, but couldn't lock it */
+	if(k > -1 && e != heaplib_error_none)
+	{
+		return e;
+	}
+
+	/* We don't care what 'e' is, only the state of k matters */
 
 	return (k == -1) ? heaplib_error_again : heaplib_error_none ;
 }
@@ -320,37 +309,9 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
  * \date December 19, 2019
  */
 heaplib_error_t
-heaplib_region_delete(heaplib_region_t r)
+heaplib_region_delete(heaplib_region_t * h)
 {
-	/* XXX what the heck is the best way to do this to force migration or
-	 * make apps/threads dealloc data in a region
-	 */
-
-	/* XXX !!! WARNING !!! XXX
-		- each lock restricts a specific Region from being altered
-		- but also helps ensure the adjacent Region is not damaged
-		- this way to delete a node we must respect the locks of the
-		  ADJACENT nodes as well because the prev ane nxt pointers
-		  must be updated
-		- this protects us so we ONLY have to lock one Region on a
-		  calloc and DONT need the entire Region lock set
-			- because if we Delete an adjacent Region, that Region
-			  cannot be deleted until the adjacent Lock is unset
-
-		PROTOCOL:
-			- lock the target Region
-			- set the Restrict and Busy flags
-			- this is the signal that we are about to delete and
-			  to Not Use
-			- if an adjacent Lock holder has the Lock already,
-			  we cannot Delete this node until they relinquish their
-			  lock
-			- so this means the next pointer in OUR locked Region is
-			  still *valid*
-			- so the person with the calloc Lock on the adjacent Region
-			  can still use our next pointer to skip past a Restrict Region
-	 */
-	return heaplib_error_fatal; // XXX not implemented yet
+	
 }
 
 /**
@@ -368,16 +329,26 @@ heaplib_region_add(vaddr_t a, size_t sz, heaplib_flags_t f)
 	heaplib_error_t e;
 	int i;
 
-	/* This process always waits */
-	heaplib_lock_lock(&heaplib_region_lock);
+	e = heaplib_region_lock_flags(&heaplib_region_lock, f);
+	if(e != heaplib_error_none)
+	{
+		PRINTF("error: heaplib_region_add: can't lock master\n");
+		return e;
+	}
 
 	h = nil;
 	for(i = 0; i < nelem(regions); i++)
 	{
-		if(!(regions[i].flags & heaplib_flags_active))
+		e = heaplib_region_lock_flags(&regions[i].lock, f);
+		if(e == heaplib_error_none)
 		{
-			h = &regions[i];
-			break;
+			if(!(regions[i].flags & heaplib_flags_active))
+			{
+				h = &regions[i];
+				break;
+			}
+
+			heaplib_lock_unlock(&regions[i].lock);
 		}
 	}
 
@@ -389,9 +360,8 @@ heaplib_region_add(vaddr_t a, size_t sz, heaplib_flags_t f)
 	}
 	else
 	{
-		heaplib_lock_init(&h->lock);
-		h->flags = f | heaplib_flags_active;
 		h->free = sz - (sizeof(*n) + sizeof(*nf));
+		h->flags = f | heaplib_flags_active;
 		h->size = sz;
 		h->addr = (vbaddr_t)a;
 		h->nodes_active = 0;
@@ -402,6 +372,8 @@ heaplib_region_add(vaddr_t a, size_t sz, heaplib_flags_t f)
 		h->free_list = n;
 
 		__heaplib_node_init(h, n);
+
+		heaplib_lock_unlock(&h->lock);
 	}
 
 	heaplib_lock_unlock(&heaplib_region_lock);

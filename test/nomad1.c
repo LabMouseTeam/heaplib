@@ -74,8 +74,6 @@ main(int argc, char * argv[])
 	signal(SIGINT, sighandler);
 	srandom(time(nil) ^ getpid());
 
-	heaplib_init();
-
 	region = (void * )calloc(1, MEMSZ);
 	heaplib_region_add((void*)region, MEMSZ /*/ 2*/, heaplib_flags_internal /*| heaplib_flags_smallreq*/);
 	// heaplib_region_add((void*)(region + (MEMSZ / 2)), MEMSZ / 2, heaplib_flags_internal /*| heaplib_flags_largereq*/);
