@@ -308,6 +308,7 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 	heaplib_node_t * b;
 	int j;
 
+	j = 0;
 	if(jp)
 		*jp = 0;
 
