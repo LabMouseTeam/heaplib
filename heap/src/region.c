@@ -95,8 +95,8 @@ __region_walk(heaplib_region_t * h)
 				&n->payload[0],
 				n->active,
 				heaplib_node_size(n),
-				n->free_t.next,
-				n->free_t.prev);
+				heaplib_free_next(n),
+				heaplib_free_prev(n));
 		}
 
 		n = heaplib_node_next(n);
@@ -494,8 +494,8 @@ __heaplib_node_init(heaplib_region_t * h, heaplib_node_t * n)
 	heaplib_footer_t * f;
 
 	n->size = h->free & ~1;
-	n->free_t.next = nil;
-	n->free_t.prev = nil;
+	heaplib_free_next(n) = nil;
+	heaplib_free_prev(n) = nil;
 	n->magic = HEAPLIB_MAGIC;
 
 	f = heaplib_node_footer(n);

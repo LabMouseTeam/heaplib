@@ -92,19 +92,19 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 				/* Found a node lower in memory than free_list
 				 * or free_list has not yet been set.
 				 */
-				a->free_t.next = h->free_list;
-				a->free_t.prev = nil;
+				heaplib_free_next(a) = h->free_list;
+				heaplib_free_prev(a) = nil;
 				if(h->free_list)
-					h->free_list->free_t.prev = a;
+					heaplib_free_prev(h->free_list) = a;
 				h->free_list = a;
 			}
 			else
 			{
-				a->free_t.next = L->free_t.next;
-				L->free_t.next = a;
-				a->free_t.prev = L;
-				if(a->free_t.next)
-					a->free_t.next->free_t.prev = a;
+				heaplib_free_next(a) = heaplib_free_next(L);
+				heaplib_free_next(L) = a;
+				heaplib_free_prev(a) = L;
+				if(heaplib_free_next(a))
+					heaplib_free_prev(heaplib_free_next(a)) = a;
 			}
 
 			h->free += heaplib_node_size(a);
@@ -422,11 +422,11 @@ __heaplib_calloc_within_region(
 				/* Temporarily add 'b' to the free list so it
 				 * can get adjusted properly later
 				 */
-				b->free_t.next = n->free_t.next;
-				n->free_t.next = b;
-				b->free_t.prev = n;
-				if(b->free_t.next)
-					b->free_t.next->free_t.prev = b;
+				heaplib_free_next(b) = heaplib_free_next(n);
+				heaplib_free_next(n) = b;
+				heaplib_free_prev(b) = n;
+				if(heaplib_free_next(b))
+					heaplib_free_prev(heaplib_free_next(b)) = b;
 
 				b->magic = HEAPLIB_MAGIC;
 
@@ -466,12 +466,12 @@ __heaplib_calloc_within_region(
 		*vp = (vaddr_t)&a->payload[0];
 
 		/* Now we can safely alter the free list */
-		if(a->free_t.prev)
-			a->free_t.prev->free_t.next = a->free_t.next;
-		if(a->free_t.next)
-			a->free_t.next->free_t.prev = a->free_t.prev;
+		if(heaplib_free_prev(a))
+			heaplib_free_next(heaplib_free_prev(a)) = heaplib_free_next(a);
+		if(heaplib_free_next(a))
+			heaplib_free_prev(heaplib_free_next(a)) = heaplib_free_prev(a);
 		if(h->free_list == a)
-			h->free_list = a->free_t.next;
+			h->free_list = heaplib_free_next(a);
 
 		memset(&a->payload[0], 0, a->size);
 
