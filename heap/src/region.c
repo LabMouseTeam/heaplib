@@ -317,7 +317,12 @@ __region_scan_next_and_lock(heaplib_region_t ** hp, vbaddr_t b, heaplib_flags_t 
 				continue;
 			}
 
+			/* Found a region that may work. See if there is a
+			 * region lower in memory but still higher than 'b'.
+			 */
+			h = &regions[i];
 			n = regions[i].addr;
+
 			/* Now test for the closest match */
 			for(j = i + 1; j < nelem(regions); j++)
 			{
