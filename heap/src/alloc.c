@@ -230,9 +230,8 @@ __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 	 */
 
 	PRINTF("__heaplib_calloc: generic? %d\n", e);
-	return e == heaplib_error_again ? 
-		heaplib_error_again :
-		heaplib_error_fatal;
+
+	return e;
 }
 
 /**
