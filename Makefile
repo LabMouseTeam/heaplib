@@ -16,6 +16,7 @@ all: $(AFILES) $(FILES)
 	$(CC) -o obj/test test/test.c obj/*.o -lpthread $(CFLAGS)
 	$(CC) -o obj/fuzz1 test/fuzz1.c obj/*.o -lpthread $(CFLAGS)
 	$(CC) -o obj/thread1 test/thread1.c obj/*.o -lpthread $(CFLAGS)
+	$(CC) -o obj/natural test/natural.c obj/*.o -lpthread $(CFLAGS)
 
 $(AFILES):
 	$(CC) -c -o $(OBJDIR)/$(subst /,+,$(PWD))+$(subst /,+,$@) $(@:%.o=%.s) $(CFLAGS)

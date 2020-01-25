@@ -365,6 +365,178 @@ __heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
 	return heaplib_error_none;
 }
 
+static heaplib_error_t
+__heaplib_calloc_do_split(
+	heaplib_region_t * h,
+	heaplib_node_t * n,
+	heaplib_node_t ** op,
+	size_t z)
+{
+	heaplib_node_t * o;
+	size_t x;
+
+	if(heaplib_node_size(n) == z || 
+   	  (heaplib_node_size(n) - z) < HEAPLIB_MIN_NODE)
+	{
+		PRINTF("node expand!\n");
+		*op = n;
+		return heaplib_error_none;
+	}
+
+	PRINTF("node: split! original node size=%ld\n", heaplib_node_size(n));
+	x = heaplib_node_size(n);
+
+	/* There's ample room to perform node split */
+	n->size = z;
+	o = heaplib_node_next(n);
+
+	/* Temporarily add 'b' to the free list so it
+ 	* can get adjusted properly later
+ 	*/
+	heaplib_free_next(o) = heaplib_free_next(n);
+	heaplib_free_next(n) = o;
+	heaplib_free_prev(o) = n;
+	if(heaplib_free_next(o))
+		heaplib_free_prev(heaplib_free_next(o)) = o;
+
+	o->magic = HEAPLIB_MAGIC;
+	o->size = x - z - (sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
+
+	PRINTF("split: new node size=%ld\n", o->size);
+
+	heaplib_footer_init(o);
+	heaplib_footer_init(n);
+
+	h->free -= (sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
+	h->nodes_free += 1;
+
+	*op = n;
+
+	return heaplib_error_none;
+}
+
+static heaplib_error_t
+__heaplib_calloc_do_natural(
+	heaplib_region_t * h,
+	heaplib_node_t * n,
+	heaplib_node_t ** op,
+	size_t z)
+{
+	heaplib_node_t * o;
+	vbaddr_t a;
+	size_t d;
+	size_t m;
+	size_t x;
+
+	PRINTF("DO NATURAL node size=%ld\n", heaplib_node_size(n));
+
+	m = z - 1;
+	a = (vbaddr_t)((size_t)&n->payload[0] & ~m);
+
+	/* Make sure our base address is within the payload */
+	if(a < &n->payload[0])
+	{
+		a += z;
+	}
+
+	/* If we got lucky and the alignment matches payload[0], which is
+	 * very unlikely, we just need to split.
+	 */
+	if(a == &n->payload[0])
+	{
+		PRINTF("unlikely!!! a == payload[0]\n");
+		return __heaplib_calloc_do_split(h, n, op, z);
+	}
+
+	do
+	{
+		/* Make sure we can hit the naturally aligned address
+ 		 * and that we also have enough room for the chunk.
+ 		 */
+		/* XXX add in enough bytes for the metadata */
+		if(!heaplib_payload_within(n, a, z))
+		{
+			PRINTF("within failed a=%p z=%ld\n", a, z);
+			return heaplib_error_fatal;
+		}
+
+		/* Otherwise, we need to split off the space before 'a' as a separate
+	 	 * payload if and only if there is enough space for at least the 
+	 	 * metadata and our minimum chunk size.
+	 	 */
+		d = a - (vbaddr_t)&n->payload[0];
+		if(d >= HEAPLIB_MIN_NODE)
+		{
+			break;
+		}
+
+		/* If 'd' is too small, keep trying until we're out of range */
+		a += z;
+	}
+	while(True);
+
+	/* Factor in the new node header and the base node's footer */
+	d -= sizeof(heaplib_node_t);
+	d -= sizeof(heaplib_footer_t);
+
+	/* If something weird happened where the node size becomes unaligned
+	 * and offset by our word/chunk size, refuse to allocate and warn
+	 * that we have a weird number of bytes.
+	 */
+	if((d % sizeof(size_t)) != 0)
+	{
+		PRINTF("warning: strange byte alignment!!!\n");
+		return heaplib_error_fatal;
+	}
+
+	/* Now we know that 'n' represents a viable node so it's OK to edit */
+	x = n->size;
+	n->size = d;
+	n->active = 0;
+
+	/* 'n' is now the prev node */
+	/* 'o' is now our natural node */
+	o = heaplib_node_next(n);
+	o->size = x - (d + sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
+	o->magic = HEAPLIB_MAGIC;
+	o->active = 0;
+
+	/* Adjust the metadata */
+	heaplib_free_prev(o) = n;
+	heaplib_free_next(o) = heaplib_free_next(n);
+	if(heaplib_free_next(o))
+		heaplib_free_prev(heaplib_free_next(o)) = o;
+
+	heaplib_free_next(n) = o;
+
+	heaplib_footer_init(o);
+	heaplib_footer_init(n);
+
+	h->nodes_free += 1;
+	h->free -= (sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
+
+	/* Now that we've got our new naturally aligned node 'o', we can
+	 * try and split it, if needs it.
+	 */
+	return __heaplib_calloc_do_split(h, o, op, z);
+}
+
+static heaplib_error_t
+__heaplib_calloc_try_natural(
+	heaplib_region_t * h,
+	heaplib_node_t * n,
+	heaplib_node_t ** op,
+	size_t z,
+	heaplib_flags_t f)
+{
+	if((f & heaplib_flags_natural) != 0)
+	{
+		return __heaplib_calloc_do_natural(h, n, op, z);
+	}
+
+	return __heaplib_calloc_do_split(h, n, op, z);
+}
+
 /**
  * \brief Attempt to allocate within a specific Region.
  *
@@ -384,17 +556,20 @@ __heaplib_calloc_within_region(
 	size_t z,
 	heaplib_flags_t f)
 {
-	heaplib_footer_t * bf;
 	heaplib_node_t * n;
-	heaplib_node_t * a;
-	heaplib_node_t * b;
-	size_t o;
+	heaplib_node_t * o;
+	heaplib_error_t r;
 
-	b = nil;
-	a = nil;
+	o = nil;
 	n = h->free_list;
 	while(n)
 	{
+		if(!heaplib_region_within(n, h))
+		{
+			PRINTF("error: ain't got nothin\n");
+			return heaplib_error_fatal;
+		}
+
 		if(n->active)
 		{
 			PRINTF("error: active node in the free list!\n");
@@ -403,89 +578,46 @@ __heaplib_calloc_within_region(
 
 		if(heaplib_node_size(n) >= z)
 		{
-			if(heaplib_node_size(n) == z || 
-			   (heaplib_node_size(n) - z) < HEAPLIB_MIN_NODE)
+			r = __heaplib_calloc_try_natural(h, n, &o, z, f);
+			if(r == heaplib_error_none)
 			{
-				PRINTF("node expand!\n");
-				a = n;
-			}
-			else
-			{
-				PRINTF("node: split! original node size=%ld\n", heaplib_node_size(n));
-
-				/* There's ample room to perform node split */
-				o = heaplib_node_size(n);
-				n->size = z;
-				b = heaplib_node_next(n);
-
-				/* Temporarily add 'b' to the free list so it
-				 * can get adjusted properly later
-				 */
-				heaplib_free_next(b) = heaplib_free_next(n);
-				heaplib_free_next(n) = b;
-				heaplib_free_prev(b) = n;
-				if(heaplib_free_next(b))
-					heaplib_free_prev(heaplib_free_next(b)) = b;
-
-				b->magic = HEAPLIB_MAGIC;
-
-				b->size = o - z - (sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
-
-				PRINTF("split: new node size=%ld\n", b->size);
-
-				bf = heaplib_node_footer(b);
-				bf->size = heaplib_node_size(b);
-				bf->magic = HEAPLIB_MAGIC;
-
-				bf = heaplib_node_footer(n);
-				bf->size = heaplib_node_size(n);
-				bf->magic = HEAPLIB_MAGIC;
-
-				h->free -= (sizeof(heaplib_node_t) + sizeof(heaplib_footer_t));
-				h->nodes_free += 1;
-
-				a = n;
+				break;
 			}
 
-			break;
+			PRINTF("error: size matched but can't alloc\n");
 		}
 
 		n = heaplib_free_next(n);
 	}
 
-	if(!a)
-	{
-		PRINTF("miss!\n");
-		*vp = nil;
-	}
-	else
-	{
-		PRINTF("found! node=%p size=%ld \n", a, a->size);
+	if(!o)
+		return heaplib_error_fatal;
 
-		*vp = (vaddr_t)&a->payload[0];
+	PRINTF("found! node=%p size=%ld \n", o, o->size);
 
-		/* Now we can safely alter the free list */
-		if(heaplib_free_prev(a))
-			heaplib_free_next(heaplib_free_prev(a)) = heaplib_free_next(a);
-		if(heaplib_free_next(a))
-			heaplib_free_prev(heaplib_free_next(a)) = heaplib_free_prev(a);
-		if(h->free_list == a)
-			h->free_list = heaplib_free_next(a);
+	*vp = (vaddr_t)&o->payload[0];
 
-		memset(&a->payload[0], 0, a->size);
+	/* Now we can safely alter the free list */
+	if(heaplib_free_prev(o))
+		heaplib_free_next(heaplib_free_prev(o)) = heaplib_free_next(o);
+	if(heaplib_free_next(o))
+		heaplib_free_prev(heaplib_free_next(o)) = heaplib_free_prev(o);
+	if(h->free_list == o)
+		h->free_list = heaplib_free_next(o);
 
-		a->pc_t.task = GET_PLATFORM_TASKID();
-		a->pc_t.flags = f;
-		a->pc_t.refs = 1;
+	memset(&o->payload[0], 0, o->size);
 
-		a->magic = HEAPLIB_MAGIC;
-		a->active = True;
+	o->pc_t.task = GET_PLATFORM_TASKID();
+	o->pc_t.flags = f;
+	o->pc_t.refs = 1;
 
-		h->free -= heaplib_node_size(a);
-		h->nodes_active += 1;
-		h->nodes_free -= 1;
-	}
+	o->magic = HEAPLIB_MAGIC;
+	o->active = True;
 
-	return (a == nil) ? heaplib_error_fatal : heaplib_error_none ;
+	h->free -= heaplib_node_size(o);
+	h->nodes_active += 1;
+	h->nodes_free -= 1;
+
+	return heaplib_error_none;
 }
 

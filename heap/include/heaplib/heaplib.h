@@ -44,6 +44,8 @@ heaplib_flags_t
 	heaplib_flags_smallreq =	(1 << 10), /**< Small requests only */
 	heaplib_flags_largereq =	(1 << 11), /**< Large requests only */
 
+	heaplib_flags_natural =		(1 << 12), /**< Natural alignment */
+
 	/* Flags for defining a Region */
 	heaplib_flags_regionmask =	(heaplib_flags_wiped |
 						heaplib_flags_internal |
@@ -180,8 +182,22 @@ heaplib_error_t
  * \date December 23, 2019
  */
 #define heaplib_node_footer(x) 						\
-	(heaplib_footer_t * )(&(x)->payload[				\
-		heaplib_node_size((x))]);
+	(heaplib_footer_t * )(&(x)->payload[heaplib_node_size((x))])
+
+/**
+ * \brief Initialize the footer structure.
+ *
+ * \param x A heaplib node.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date January 24, 2020
+ */
+#define heaplib_footer_init(x) ({					\
+	heaplib_footer_t * __f;						\
+	__f = heaplib_node_footer((x));					\
+	__f->size = heaplib_node_size((x));				\
+	__f->magic = HEAPLIB_MAGIC;					\
+})
 
 /**
  * \brief Rewind through the previous heaplib list.
@@ -212,6 +228,20 @@ heaplib_error_t
 					heaplib_node_size((x)) +	\
 					sizeof(heaplib_footer_t)]	\
 				))
+
+/**
+ * \brief Ensure an address chunk is within a node's payload.
+ *
+ * \param x A heaplib node 
+ * \param y An address within the node's payload
+ * \param z The size of the chunk at address 'y'
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date January 12, 2020
+ */
+#define heaplib_payload_within(x, y, z) \
+	(((vbaddr_t)(&(x)->payload[0]) <= (vbaddr_t)(y)) && \
+	 ((((vbaddr_t)(y)) + (z)) < (vbaddr_t)(heaplib_node_footer((x)))))
 
 /* Initialization */
 extern void heaplib_init(void);
