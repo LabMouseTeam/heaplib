@@ -25,6 +25,7 @@ $(FILES):
 	$(CC) -c -o $(OBJDIR)/$(subst /,+,$(PWD))+$(subst /,+,$@) $(@:%.o=%.c) $(CFLAGS)
 
 clean:
+	rm -f ./obj/*
 
 install: 
 
