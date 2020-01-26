@@ -10,7 +10,7 @@
 
 #include "heaplib/heaplib.h"
 
-#define NTHREADS 1
+#define NTHREADS 16
 
 #define BIGMEMSZ (512 * 1024 )
 #define MEMSZ (32 * 1024 )
@@ -70,6 +70,8 @@ main(int argc, char * argv[])
 	int i;
 
 	PRINTF("main!\n");
+
+	PRINTF("SIZEOF node=%d foot=%d\n", sizeof(heaplib_node_t), sizeof(heaplib_footer_t));
 
 	signal(SIGINT, sighandler);
 	srandom(time(nil) ^ getpid());

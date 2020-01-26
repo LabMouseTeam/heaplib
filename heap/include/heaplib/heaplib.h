@@ -89,7 +89,7 @@ heaplib_node_t
 		size_t size;
 	};
 
-	// union {
+	union {
 		struct {
 			task_t task;
 			union {
@@ -104,7 +104,7 @@ heaplib_node_t
 			heaplib_node_t * next;
 			heaplib_node_t * prev;
 		} free_t;
-	// };
+	};
 
 	heaplib_magic_t magic;
 
