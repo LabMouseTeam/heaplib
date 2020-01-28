@@ -14,8 +14,6 @@
 #include <string.h>
 #include <stdio.h>
 
-static heaplib_lock_t alloc_lock;
-
 static heaplib_error_t __heaplib_calloc_do_split(
 				heaplib_region_t *,
 				heaplib_node_t *,
@@ -47,8 +45,8 @@ static heaplib_error_t __heaplib_calloc_within_region(
 				size_t,
 				heaplib_flags_t);
 
+static heaplib_error_t __heaplib_coalesce(heaplib_region_t *, int * );
 static heaplib_error_t __heaplib_calloc(vaddr_t *, size_t, heaplib_flags_t);
-static heaplib_error_t __heaplib_coalesce(heaplib_region_t *, heaplib_flags_t, int * );
 
 /**
  * \brief Free a node.
@@ -161,7 +159,7 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			   (heaplib_region_within(L, h) && !L->active))
 			{
 				PRINTF("WARN: forced free coalesce\n");
-				__heaplib_coalesce(h, f, nil);
+				__heaplib_coalesce(h, nil);
 			}
 
 			/* If all memory is free'd and we're restricted,
@@ -244,7 +242,6 @@ static heaplib_error_t
 __heaplib_calloc(vaddr_t * vp, size_t z, heaplib_flags_t f)
 {
 	heaplib_region_t * h;
-	heaplib_region_t * n;
 	heaplib_error_t e;
 
 	*vp = nil;
@@ -345,7 +342,7 @@ __heaplib_calloc_with_coalesce(
 				PRINTF("FORCED COALESCE!\n");
 			}
 
-			__heaplib_coalesce(h, f, &j);
+			__heaplib_coalesce(h, &j);
 		}
 
 		if(e == heaplib_error_none)
@@ -370,7 +367,7 @@ __heaplib_calloc_with_coalesce(
  * \date December 20, 2019
  */
 static heaplib_error_t
-__heaplib_coalesce(heaplib_region_t * h, heaplib_flags_t f, int * jp)
+__heaplib_coalesce(heaplib_region_t * h, int * jp)
 {
 	heaplib_footer_t * bf;
 	heaplib_node_t * a;

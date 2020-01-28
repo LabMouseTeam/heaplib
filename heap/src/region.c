@@ -14,8 +14,6 @@
 static heaplib_region_t regions[NREGIONS];
 static heaplib_lock_t heaplib_region_lock;
 
-static void __region_walk(heaplib_region_t * );
-
 static heaplib_error_t __region_test_and_lock(
 				heaplib_region_t *,
 				heaplib_flags_t);
@@ -40,29 +38,6 @@ heaplib_init(void)
 }
 
 #if DEBUG
-void
-heaplib_walk(void)
-{
-	boolean_t x;
-	int i;
-
-	/* First thing we do is attempt to lock the Master. */
-
-	/* This will always succeed because we are guaranteed to wait. */
-	heaplib_region_lock_flags(&heaplib_region_lock, heaplib_flags_wait);
-
-	for(i = 0; i < nelem(regions); i++)
-	{
-		PRINTF("walk: region=%d\n", i);
-		/* This debugging routine always waits */
-		heaplib_lock_lock(&regions[i].lock);
-		__region_walk(&regions[i]);
-		heaplib_lock_unlock(&regions[i].lock);
-	}
-
-	heaplib_lock_unlock(&heaplib_region_lock);
-}
-
 static void
 __region_walk(heaplib_region_t * h)
 {
@@ -112,6 +87,29 @@ __region_walk(heaplib_region_t * h)
 
 		n = heaplib_node_next(n);
 	}
+}
+
+void
+heaplib_walk(void)
+{
+	boolean_t x;
+	int i;
+
+	/* First thing we do is attempt to lock the Master. */
+
+	/* This will always succeed because we are guaranteed to wait. */
+	heaplib_region_lock_flags(&heaplib_region_lock, heaplib_flags_wait);
+
+	for(i = 0; i < nelem(regions); i++)
+	{
+		PRINTF("walk: region=%d\n", i);
+		/* This debugging routine always waits */
+		heaplib_lock_lock(&regions[i].lock);
+		__region_walk(&regions[i]);
+		heaplib_lock_unlock(&regions[i].lock);
+	}
+
+	heaplib_lock_unlock(&heaplib_region_lock);
 }
 #endif
 
@@ -179,7 +177,6 @@ heaplib_error_t
 heaplib_region_find_first(heaplib_region_t ** rp, heaplib_flags_t f)
 {
 	heaplib_error_t e;
-	boolean_t x;
 	int i;
 
 	/* First thing we do is attempt to lock the Master. Yield to flags */

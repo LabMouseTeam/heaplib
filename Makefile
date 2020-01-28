@@ -4,7 +4,7 @@
 
 OBJDIR=`pwd`/obj
 PWD=`pwd`
-CFLAGS=-Iheap/include -Iplatform/linux/include -g -ggdb -static -O3
+CFLAGS=-Iheap/include -Iplatform/linux/include -g -ggdb -static -O3 -fPIC -pedantic -W -Wall
 FILES=\
 	heap/src/alloc.o\
 	heap/src/region.o\
