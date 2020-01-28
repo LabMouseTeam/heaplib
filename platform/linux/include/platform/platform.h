@@ -20,7 +20,7 @@ enum
 
 #define nil ((void * )0)
 
-#define nelem(x) (sizeof(x)/sizeof((x)[0]))
+#define nelem(x) (int)(sizeof(x)/sizeof((x)[0]))
 
 typedef int boolean_t;
 typedef pthread_t task_t;
