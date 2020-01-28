@@ -1,5 +1,5 @@
 # heaplib-public
-The Lab Mouse heap memory implementation.
+The Lab Mouse Inc. heap memory implementation.
 
 # Initialization
 Before performing allocations or region setup, simply call init:
