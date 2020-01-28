@@ -1,3 +1,11 @@
+/**
+ * \file platform/linux/include/platform/platform.h
+ *
+ * \brief Platform fundamentals for Lab Mouse heaplib.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 17, 2019
+ */
 #include <stdint.h>
 #include <stdlib.h>
 #define _GNU_SOURCE

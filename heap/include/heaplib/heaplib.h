@@ -1,3 +1,11 @@
+/**
+ * \file heap/include/heaplib/heaplib.h
+ *
+ * \brief Lab Mouse heaplib fundamentals.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 17, 2019
+ */
 #include "platform/platform.h"
 
 #define HEAPLIB_MAGIC 0xDEADF417ULL
@@ -171,7 +179,7 @@ heaplib_error_t
  * \date December 24, 2019
  */
 #define heaplib_region_within(x, y) (((vbaddr_t)(x) >= (y)->addr) && \
-					(vbaddr_t)(x) < ((y)->addr + (y)->size))
+		(vbaddr_t)(x) < ((y)->addr + (y)->size))
 
 /**
  * \brief Return the footer of a node.
@@ -278,13 +286,16 @@ __validate_region_request(heaplib_region_t * h, size_t z)
 		return True;
 	}
 
-	if((h->flags & heaplib_flags_smallreq) && z < HEAPLIB_REQUEST_THRESHOLD(h))
+	if((h->flags & heaplib_flags_smallreq) &&
+	    z < HEAPLIB_REQUEST_THRESHOLD(h))
 	{
 		return True;
 	}
 
-	return ((h->flags & heaplib_flags_largereq) && z >= HEAPLIB_REQUEST_THRESHOLD(h)) || 
-		((h->flags & heaplib_flags_largereq) && z < HEAPLIB_REQUEST_THRESHOLD(h));
+	return ((h->flags & heaplib_flags_largereq) &&
+		 z >= HEAPLIB_REQUEST_THRESHOLD(h)) || 
+		((h->flags & heaplib_flags_largereq) && 
+		  z < HEAPLIB_REQUEST_THRESHOLD(h));
 }
 
 /* Region handling */

@@ -1,3 +1,11 @@
+/**
+ * \file platform/linux/src/printf.c
+ *
+ * \brief Print stuff on Linux.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 17, 2019
+ */
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
