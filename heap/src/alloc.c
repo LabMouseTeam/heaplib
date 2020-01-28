@@ -1,3 +1,15 @@
+/**
+ * \file heap/src/alloc.c
+ *
+ * \brief Memory allocation routines for heaplib.
+ *
+ * Allocate and deallocate memory within a specific memory region. Use flags
+ * to adjust how this occurs. Enable natural alignment to ensure that each
+ * address can be used appropriately. Coalesce on demand to improve reaction.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 22, 2020
+ */
 #include "heaplib/heaplib.h"
 #include <string.h>
 #include <stdio.h>
@@ -38,6 +50,15 @@ static heaplib_error_t __heaplib_calloc_within_region(
 static heaplib_error_t __heaplib_calloc(vaddr_t *, size_t, heaplib_flags_t);
 static heaplib_error_t __heaplib_coalesce(heaplib_region_t *, heaplib_flags_t, int * );
 
+/**
+ * \brief Free a node.
+ *
+ * \param vp [in] The pointer to free.
+ * \param f [in] Flags.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 23, 2020
+ */
 heaplib_error_t
 heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 {
@@ -162,6 +183,17 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 	return heaplib_error_fatal;
 }
 
+/**
+ * \brief Allocate memory.
+ *
+ * \param vp [out] The allocated payload base address.
+ * \param x [in] Scale of allocation.
+ * \param y [in] Size of allocation.
+ * \param f [in] Allocation flags.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 22, 2020
+ */
 heaplib_error_t
 heaplib_calloc(vaddr_t * vp, size_t x, size_t y, heaplib_flags_t f)
 {

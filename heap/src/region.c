@@ -1,3 +1,13 @@
+/**
+ * \file heap/src/region.c
+ *
+ * \brief Management of memory regions.
+ *
+ * Manage segments of physical or virtual memory, known as regions.
+ *
+ * \author Don A. Bailey <donb@labmou.se>
+ * \date December 22, 2020
+ */
 #include "heaplib/heaplib.h"
 #include <stdio.h>
 
@@ -29,6 +39,7 @@ heaplib_init(void)
 	heaplib_lock_init(&heaplib_region_lock);
 }
 
+#if DEBUG
 void
 heaplib_walk(void)
 {
@@ -102,6 +113,7 @@ __region_walk(heaplib_region_t * h)
 		n = heaplib_node_next(n);
 	}
 }
+#endif
 
 /**
  * \brief Convert a heap pointer to the Region that supports it.
@@ -216,7 +228,7 @@ __region_test_and_lock(heaplib_region_t * rp, heaplib_flags_t f)
 	   (rp->flags & heaplib_flags_restrict) == 0 &&
 	   (rp->flags & heaplib_flags_busy) == 0)
 	{
-		/* Either no flags are set (get any) or the flags match exactly */
+		/* Either no flags are set (get any) or flags match exactly */
 		if((f & heaplib_flags_regionmask) == 0 ||
 	   	   ((f & heaplib_flags_regionmask) == 
 		    (rp->flags & heaplib_flags_regionmask)))
@@ -286,7 +298,10 @@ heaplib_region_find_next(heaplib_region_t ** rp, heaplib_flags_t f)
  * \author Don A. Bailey <donb@labmou.se>
  */
 static heaplib_error_t
-__region_scan_next_and_lock(heaplib_region_t ** hp, vbaddr_t b, heaplib_flags_t f)
+__region_scan_next_and_lock(
+	heaplib_region_t ** hp,
+	vbaddr_t b,
+	heaplib_flags_t f)
 {
 	heaplib_region_t * h;
 	heaplib_error_t e;
@@ -309,9 +324,9 @@ __region_scan_next_and_lock(heaplib_region_t ** hp, vbaddr_t b, heaplib_flags_t 
 				continue;
 			}
 
-			/* Now, ensure the 'n'ew address is lower in memory than
-		 	* anything new we'd like to test.
-		 	*/
+			/* Now, ensure the 'n'ew address is lower in memory
+		 	 * than anything new we'd like to test.
+		 	 */
 			if(n > b && regions[i].addr >= n)
 			{
 				continue;
@@ -396,7 +411,9 @@ heaplib_region_delete(heaplib_region_t * h)
 	heaplib_error_t e;
 	int i;
 
-	e = heaplib_region_lock_flags(&heaplib_region_lock, heaplib_flags_wait);
+	e = heaplib_region_lock_flags(
+		&heaplib_region_lock,
+		heaplib_flags_wait);
 	if(e != heaplib_error_none)
 	{
 		PRINTF("error: heaplib_region_add: can't lock master\n");

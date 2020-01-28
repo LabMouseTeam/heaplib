@@ -187,6 +187,7 @@ run(void * _x)
 			}
 			else
 			{
+				natural = 0;
 				sz = random() % ALLOCSZ;
 				if(sz == 0)
 					sz = 1;
@@ -203,6 +204,11 @@ run(void * _x)
 				oom = True;
 				pthread_mutex_unlock(&lock);
 				break;
+			}
+
+			if(natural && ((size_t)x[i].a & (sz - 1)))
+			{
+				PRINTF("error: address %p is unnatural sz=%ld\n", x[i].a, sz);
 			}
 
 			x[i].c = random() % 254;

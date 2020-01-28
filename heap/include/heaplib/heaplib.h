@@ -247,7 +247,11 @@ heaplib_error_t
 extern void heaplib_init(void);
 
 /* Auxiliary */
+#if DEBUG
 extern void heaplib_walk(void);
+#else
+# define heaplib_walk()
+#endif
 
 /* Region handling */
 __attribute__((always_inline)) __inline__ heaplib_error_t
@@ -297,7 +301,4 @@ extern heaplib_error_t heaplib_calloc(vaddr_t *, size_t, size_t, heaplib_flags_t
 
 /* Pointer to Node conversion */
 extern boolean_t heaplib_ptr2node(heaplib_region_t *, vaddr_t, heaplib_node_t ** );
-
-/* Debug */
-extern void heaplib_walk(void);
 
