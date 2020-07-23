@@ -43,7 +43,7 @@ validate(test_unit_t * x)
 	int i;
 
 	b = (vbaddr_t)x->a;
-	for(i = 0; i < x->sz; i++)
+	for(i = 0; i < (int)x->sz; i++)
 	{
 		if(b[i] != x->c)
 		{
@@ -56,13 +56,14 @@ validate(test_unit_t * x)
 }
 
 static void
-sighandler(int x)
+sighandler(int _x)
 {
+	USED(_x);
 	interrupted = True;
 }
 
 int
-main(int argc, char * argv[])
+main(void)
 {
 	pthread_t threads[NTHREADS];
 	uint8_t * region;
@@ -122,7 +123,9 @@ main(int argc, char * argv[])
 	}
 
 	PRINTF("stats allocs=%d frees=%d\n", allocs, frees);
-	heaplib_walk();
+	//heaplib_walk();
+
+	return 0;
 }
 
 static void *
@@ -138,6 +141,8 @@ run(void * _x)
 	boolean_t b;
 
 	PRINTF("--- init thread=%ld ---\n", pthread_self());
+
+	USED(_x);
 
 	memset(&x[0], 0, sizeof x);
 
@@ -245,5 +250,7 @@ run(void * _x)
 	}
 
 	PRINTF("\n--- EXIT thread=%ld %s ---\n", pthread_self(), interrupted ? "interrupted" : "OOM");
+
+	return nil;
 }
 

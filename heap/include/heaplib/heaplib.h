@@ -27,9 +27,7 @@
 				sizeof(heaplib_footer_t))
 
 typedef size_t heaplib_magic_t;
-typedef enum heaplib_flags_t heaplib_flags_t;
 
-typedef enum heaplib_error_t heaplib_error_t;
 typedef struct heaplib_node_t heaplib_node_t;
 typedef struct heaplib_footer_t heaplib_footer_t;
 typedef struct heaplib_region_t heaplib_region_t;
@@ -74,6 +72,8 @@ heaplib_flags_t
 	heaplib_flags_dontusemask =	(heaplib_flags_restrict |
 						heaplib_flags_busy),
 };
+
+typedef enum heaplib_flags_t heaplib_flags_t;
 
 struct
 heaplib_region_t
@@ -144,6 +144,8 @@ heaplib_error_t
 	heaplib_error_fatal =		1,	/* Operation failure */
 	heaplib_error_again =		2,	/* Try again later */
 };
+
+typedef enum heaplib_error_t heaplib_error_t;
 
 #define heaplib_node_size(x) (((x)->size) & ~1)
 

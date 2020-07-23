@@ -20,6 +20,8 @@ enum
 
 #define nil ((void * )0)
 
+#define USED(x) ((x) = (*(&(x))))
+
 #define nelem(x) (int)(sizeof(x)/sizeof((x)[0]))
 
 typedef int boolean_t;
