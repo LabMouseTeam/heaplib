@@ -6,10 +6,10 @@
  * \author Don A. Bailey <donb@labmou.se>
  * \date July 25, 2020
  */
-#include <stdint.h>
-#include <stdlib.h>
+#include "arch/stdint.h"
+#include "stdlib.h"
+#include "mutex.h"
 
-typedef int boolean_t;
 typedef harvest_task_t task_t;
 typedef harvest_mutex_t heaplib_lock_t;
 
