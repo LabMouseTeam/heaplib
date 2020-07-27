@@ -24,7 +24,7 @@ endif
 ifndef CFLAGS
 	CFLAGS=-g -ggdb -static -O3 -fPIC -W -Wall
 endif
-CFLAGS+=-Iheap/include -Iplatform/$(PLATFORM)/include
+CFLAGS+=-Iheap/include -Iplatform/$(PLATFORM)/include -DINTERNAL
 
 FILES=\
 	heap/src/alloc.o\
@@ -34,15 +34,16 @@ FILES=\
 all: $(AFILES) $(FILES) $(TESTS)
 
 thread1:
-	$(CC) -o obj/$@ test/$@.c obj/*.o -lpthread $(CFLAGS) -DDEBUG
+	$(CC) -o obj/$@ test/$@.c obj/*.o -lpthread $(CFLAGS) -DDEBUG -Iplatform/$(PLATFORM)/include 
 natural:
-	$(CC) -o obj/$@ test/$@.c obj/*.o -lpthread $(CFLAGS) -DDEBUG
+	$(CC) -o obj/$@ test/$@.c obj/*.o -lpthread $(CFLAGS) -DDEBUG -Iplatform/$(PLATFORM)/include 
+
 
 $(AFILES):
-	$(CC) -c -o $(OBJDIR)/$(subst /,+,$(PWD))+$(subst /,+,$@) $(@:%.o=%.s) $(CFLAGS)
+	$(CC) -c -o $(OBJDIR)/$(subst /,+,$(PWD))+$(subst /,+,$@) $(@:%.o=%.s) $(CFLAGS) -Iplatform/$(PLATFORM)/include 
 
 $(FILES):
-	$(CC) -c -o $(OBJDIR)/$(subst /,+,$(PWD))+$(subst /,+,$@) $(@:%.o=%.c) $(CFLAGS)
+	$(CC) -c -o $(OBJDIR)/$(subst /,+,$(PWD))+$(subst /,+,$@) $(@:%.o=%.c) $(CFLAGS) -Iplatform/$(PLATFORM)/include
 
 clean: $(CDIRS)
 

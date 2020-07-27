@@ -6,11 +6,13 @@
  * \author Don A. Bailey <donb@labmou.se>
  * \date December 17, 2019
  */
-#include <pthread.h>
+#if 0
 #include <stdarg.h>
-#include <stdio.h>
+#include "arch/stdint.h"
+#include "stdio.h"
+#include "mutex.h"
 
-static pthread_mutex_t plock = PTHREAD_MUTEX_INITIALIZER;
+static harvest_mutex_t plock;
 
 void
 thread_printf(const char * fmt, ... )
@@ -28,4 +30,5 @@ thread_printf(const char * fmt, ... )
 
 	va_end(L);
 }
+#endif
 

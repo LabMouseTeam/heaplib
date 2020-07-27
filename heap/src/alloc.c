@@ -11,8 +11,6 @@
  * \date December 22, 2020
  */
 #include "heaplib/heaplib.h"
-#include <string.h>
-#include <stdio.h>
 
 static heaplib_error_t __heaplib_calloc_do_split(
 				heaplib_region_t *,
