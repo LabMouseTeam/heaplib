@@ -9,7 +9,6 @@
  * \date December 22, 2020
  */
 #include "heaplib/heaplib.h"
-#include <stdio.h>
 
 static heaplib_region_t regions[NREGIONS];
 static heaplib_lock_t heaplib_region_lock;

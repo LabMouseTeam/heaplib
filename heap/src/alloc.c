@@ -11,8 +11,6 @@
  * \date December 22, 2020
  */
 #include "heaplib/heaplib.h"
-#include <string.h>
-#include <stdio.h>
 
 static heaplib_error_t __heaplib_calloc_do_split(
 				heaplib_region_t *,
@@ -123,6 +121,10 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			}
 
 			a->active = False;
+			if(a->pc_t.flags & heaplib_flags_wiped)
+			{
+				memset(&a->payload[0], 0, a->size);
+			}
 
 			/* Place the node back in the list */
 			if(!L)
