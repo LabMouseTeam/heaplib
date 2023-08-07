@@ -3,7 +3,9 @@
 #
 
 ifndef PLATFORM
-	PLATFORM=linux
+	PLATFORM=harvest
+	CC=riscv32-unknown-elf-gcc
+	CDIRS=clean_obj
 endif
 
 CDIRS=
@@ -13,16 +15,16 @@ ifeq ($(PLATFORM), linux)
 	CDIRS=clean_obj
 endif
 
-ifndef OBJDIR
-	OBJDIR=`pwd`/obj
-endif
-
 ifndef PWD
 	PWD=$(subst $(TOPLEVEL),,$(shell pwd))
 endif
 
+ifndef OBJDIR
+	OBJDIR=$(PWD)/obj/.
+endif
+
 ifndef CFLAGS
-	CFLAGS=-g -ggdb -static -O3 -fPIC -W -Wall
+	CFLAGS=-g -ggdb -O3 -fPIC -W -Wall
 endif
 CFLAGS+=-Iheap/include -Iplatform/$(PLATFORM)/include -DINTERNAL
 

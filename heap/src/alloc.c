@@ -121,6 +121,10 @@ heaplib_free(vaddr_t * vp, heaplib_flags_t f)
 			}
 
 			a->active = False;
+			if(a->pc_t.flags & heaplib_flags_wiped)
+			{
+				memset(&a->payload[0], 0, a->size);
+			}
 
 			/* Place the node back in the list */
 			if(!L)

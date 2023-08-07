@@ -8,6 +8,7 @@
  */
 #ifdef INTERNAL
 # include "arch/stdint.h"
+# include "subarch/sched.h"
 # include "stdlib.h"
 # include "mutex.h"
 # include "task.h"
@@ -39,5 +40,5 @@ heaplib_lock_trylock(heaplib_lock_t * x) {
 #define GET_PLATFORM_TASKID() (task_t)nil
 
 /* How many regions do we support? In the future, this will be dynamic */
-#define NREGIONS 4
+#define NREGIONS 1
 
